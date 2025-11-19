@@ -17,7 +17,6 @@ const ENotGroupOwner: u64 = 1;
 const EGroupFull: u64 = 2;
 const EInvalidFee: u64 = 3;
 const ESubscriptionExpired: u64 = 4;
-const EAlreadySubscribed: u64 = 5;
 const EInvalidSubscription: u64 = 6;
 
 // ====== Version Management ======
@@ -186,6 +185,7 @@ public fun create_group(
 }
 
 /// Entry function to create and share a group
+#[allow(lint(share_owned))]
 entry fun create_group_entry(
     name: String,
     description: String,
@@ -307,7 +307,7 @@ entry fun subscribe_with_access_key_entry(
         ctx
     );
     transfer::transfer(subscription, ctx.sender());
-    transfer::transfer(access_key, ctx.sender());
+    transfer::public_transfer(access_key, ctx.sender());
 }
 
 /// Publish a report to the group
@@ -352,6 +352,7 @@ public fun publish_report(
 }
 
 /// Entry function to publish and share a report
+#[allow(lint(share_owned))]
 entry fun publish_report_entry(
     group: &mut Group,
     admin_cap: &GroupAdminCap,

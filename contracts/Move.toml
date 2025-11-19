@@ -4,13 +4,7 @@ version = "1.0.0"
 edition = "2024.beta"
 
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
 
 [addresses]
 web3fans = "0x0"
-sui = "0x2"
-
-# Note: Sui Seal is currently in development, below is a reference implementation
-# In production, you can directly use Seal's subscription pattern
-# Seal = { git = "https://github.com/MystenLabs/seal.git", subdir = "move", rev = "main" }
 
