@@ -1,63 +1,181 @@
-import CryptoJS from 'crypto-js';
-
 /**
- * Generate a random encryption key
+ * Encryption utilities for Seal integration
+ * Using Web Crypto API for AES-GCM encryption
  */
-export function generateEncryptionKey(): string {
-  return CryptoJS.lib.WordArray.random(256 / 8).toString();
+
+export interface EncryptedFileData {
+  encryptedBlob: Blob;
+  keyId: Uint8Array;
+  encryptionKey: Uint8Array;
 }
 
 /**
- * Encrypt content with AES
+ * Generate a random encryption key (32 bytes for AES-256)
  */
-export function encryptContent(content: string, key: string): string {
-  return CryptoJS.AES.encrypt(content, key).toString();
+export async function generateEncryptionKey(): Promise<CryptoKey> {
+  return await crypto.subtle.generateKey(
+    {
+      name: 'AES-GCM',
+      length: 256,
+    },
+    true, // extractable
+    ['encrypt', 'decrypt']
+  );
 }
 
 /**
- * Decrypt content with AES
+ * Export key to raw bytes
  */
-export function decryptContent(encryptedContent: string, key: string): string {
-  const bytes = CryptoJS.AES.decrypt(encryptedContent, key);
-  return bytes.toString(CryptoJS.enc.Utf8);
+export async function exportKeyBytes(key: CryptoKey): Promise<Uint8Array> {
+  const keyBuffer = await crypto.subtle.exportKey('raw', key);
+  return new Uint8Array(keyBuffer);
 }
 
 /**
- * Encrypt file
+ * Import key from raw bytes
  */
-export async function encryptFile(file: File, key: string): Promise<Blob> {
-  const content = await file.arrayBuffer();
-  const wordArray = CryptoJS.lib.WordArray.create(new Uint8Array(content) as any);
-  const encrypted = CryptoJS.AES.encrypt(wordArray, key).toString();
-  return new Blob([encrypted], { type: 'application/octet-stream' });
+export async function importKeyBytes(keyBytes: Uint8Array): Promise<CryptoKey> {
+  return await crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    {
+      name: 'AES-GCM',
+      length: 256,
+    },
+    true,
+    ['encrypt', 'decrypt']
+  );
 }
 
 /**
- * Decrypt file
+ * Encrypt file for Seal/Walrus storage
+ * Returns encrypted data with IV and keyId
  */
-export async function decryptFile(encryptedBlob: Blob, key: string): Promise<Blob> {
-  const encryptedContent = await encryptedBlob.text();
-  const decrypted = CryptoJS.AES.decrypt(encryptedContent, key);
-  const wordArray = decrypted.words;
-  const uint8Array = new Uint8Array(wordArray.length * 4);
+export async function encryptFile(
+  file: File,
+  groupId: string
+): Promise<EncryptedFileData> {
+  // Generate encryption key
+  const key = await generateEncryptionKey();
+  const keyBytes = await exportKeyBytes(key);
   
-  for (let i = 0; i < wordArray.length; i++) {
-    const word = wordArray[i];
-    uint8Array[i * 4] = (word >> 24) & 0xff;
-    uint8Array[i * 4 + 1] = (word >> 16) & 0xff;
-    uint8Array[i * 4 + 2] = (word >> 8) & 0xff;
-    uint8Array[i * 4 + 3] = word & 0xff;
+  // Read file content
+  const fileBuffer = await file.arrayBuffer();
+  
+  // Generate IV (Initialization Vector)
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for GCM
+  
+  // Encrypt the file
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv,
+    },
+    key,
+    fileBuffer
+  );
+  
+  // Generate keyId: groupId (32 bytes) + reportId (8 bytes random) + nonce (8 bytes random)
+  const groupIdBytes = hexToBytes(groupId.replace('0x', '').padStart(64, '0'));
+  const reportIdBytes = crypto.getRandomValues(new Uint8Array(8));
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(8));
+  
+  const keyId = new Uint8Array(48); // 32 + 8 + 8
+  keyId.set(groupIdBytes, 0);
+  keyId.set(reportIdBytes, 32);
+  keyId.set(nonceBytes, 40);
+  
+  // Combine IV + ciphertext into a single blob
+  // Format: [IV(12 bytes)][ciphertext]
+  const encryptedData = new Uint8Array(iv.length + ciphertext.byteLength);
+  encryptedData.set(iv, 0);
+  encryptedData.set(new Uint8Array(ciphertext), iv.length);
+  
+  const encryptedBlob = new Blob([encryptedData], { type: 'application/octet-stream' });
+  
+  return {
+    encryptedBlob,
+    keyId,
+    encryptionKey: keyBytes,
+  };
+}
+
+/**
+ * Decrypt file from Walrus
+ */
+export async function decryptFile(
+  encryptedBlob: Blob,
+  encryptionKey: Uint8Array
+): Promise<Blob> {
+  // Read encrypted data
+  const encryptedBuffer = await encryptedBlob.arrayBuffer();
+  const encryptedData = new Uint8Array(encryptedBuffer);
+  
+  // Extract IV (first 12 bytes) and ciphertext
+  const iv = encryptedData.slice(0, 12);
+  const ciphertext = encryptedData.slice(12);
+  
+  // Import key
+  const key = await importKeyBytes(encryptionKey);
+  
+  // Decrypt
+  const decrypted = await crypto.subtle.decrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv,
+    },
+    key,
+    ciphertext
+  );
+  
+  return new Blob([decrypted]);
+}
+
+/**
+ * Convert hex string to bytes
+ */
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
   }
-  
-  return new Blob([uint8Array]);
+  return bytes;
 }
 
 /**
- * Store encryption key in Seal (this would be handled by the backend)
+ * Convert bytes to hex string
+ */
+export function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Convert bytes to base64
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes));
+}
+
+/**
+ * Convert base64 to bytes
+ */
+export function base64ToBytes(base64: string): Uint8Array {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Store encryption key in backend Seal service
  */
 export async function storeKeyInSeal(
   keyId: Uint8Array,
-  encryptionKey: string,
+  encryptionKey: Uint8Array,
   apiUrl: string
 ): Promise<void> {
   const response = await fetch(`${apiUrl}/seal/store-key`, {
@@ -67,23 +185,24 @@ export async function storeKeyInSeal(
     },
     body: JSON.stringify({
       keyId: Array.from(keyId),
-      encryptionKey,
+      encryptionKey: bytesToBase64(encryptionKey),
     }),
   });
   
   if (!response.ok) {
-    throw new Error('Failed to store key in Seal');
+    const error = await response.text();
+    throw new Error(`Failed to store key in Seal: ${error}`);
   }
 }
 
 /**
- * Retrieve encryption key from Seal
+ * Retrieve encryption key from backend Seal service
  */
 export async function retrieveKeyFromSeal(
   keyId: Uint8Array,
-  subscriptionProof: any,
+  accessKeyId: string,
   apiUrl: string
-): Promise<string> {
+): Promise<Uint8Array> {
   const response = await fetch(`${apiUrl}/seal/retrieve-key`, {
     method: 'POST',
     headers: {
@@ -91,15 +210,15 @@ export async function retrieveKeyFromSeal(
     },
     body: JSON.stringify({
       keyId: Array.from(keyId),
-      subscriptionProof,
+      accessKeyId,
     }),
   });
   
   if (!response.ok) {
-    throw new Error('Failed to retrieve key from Seal');
+    const error = await response.text();
+    throw new Error(`Failed to retrieve key from Seal: ${error}`);
   }
   
   const data = await response.json();
-  return data.encryptionKey;
+  return base64ToBytes(data.encryptionKey);
 }
-

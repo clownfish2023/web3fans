@@ -20,6 +20,7 @@ export function useContract() {
     subscriptionPeriod: number,
     maxMembers: number,
     telegramGroupId: string,
+    telegramInviteLink: string,
     clockId: string = '0x6'
   ) => {
     if (!currentAccount) throw new Error('Wallet not connected');
@@ -35,10 +36,11 @@ export function useContract() {
         arguments: [
           tx.pure.string(name),
           tx.pure.string(description),
-          tx.pure.u64(subscriptionFee.toString()),
+          tx.pure.u64(subscriptionFee),
           tx.pure.u64(subscriptionPeriod),
           tx.pure.u64(maxMembers),
           tx.pure.string(telegramGroupId),
+          tx.pure.string(telegramInviteLink),
           tx.object(clockId),
         ],
       });
@@ -48,6 +50,9 @@ export function useContract() {
       });
 
       return result;
+    } catch (error) {
+      console.error('Create group error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +76,7 @@ export function useContract() {
       const subscriptionFee = suiToMist(subscriptionFeeSui);
       
       // Split coin for payment
-      const [coin] = tx.splitCoins(tx.gas, [subscriptionFee.toString()]);
+      const [coin] = tx.splitCoins(tx.gas, [subscriptionFee]);
       
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE_NAME}::${FUNCTIONS.SUBSCRIBE}`,
@@ -88,6 +93,9 @@ export function useContract() {
       });
 
       return result;
+    } catch (error) {
+      console.error('Subscribe error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -241,6 +249,23 @@ export function useContract() {
     return objects.data;
   };
 
+  /**
+   * Get user's admin caps (groups they own)
+   */
+  const getUserAdminCaps = async (address: string) => {
+    const objects = await client.getOwnedObjects({
+      owner: address,
+      filter: {
+        StructType: `${PACKAGE_ID}::${MODULE_NAME}::GroupAdminCap`,
+      },
+      options: {
+        showContent: true,
+      },
+    });
+    
+    return objects.data;
+  };
+
   return {
     createGroup,
     subscribe,
@@ -251,6 +276,7 @@ export function useContract() {
     getReport,
     getAllGroups,
     getUserSubscriptions,
+    getUserAdminCaps,
     isLoading,
   };
 }

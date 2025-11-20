@@ -64,6 +64,8 @@ public struct Group has key, store {
     current_members: u64,
     /// Telegram group ID
     telegram_group_id: String,
+    /// Telegram invite link
+    telegram_invite_link: String,
     /// Reports published in this group
     report_count: u64,
     /// Group creation timestamp
@@ -147,6 +149,7 @@ public fun create_group(
     subscription_period: u64,
     max_members: u64,
     telegram_group_id: String,
+    telegram_invite_link: String,
     clock: &Clock,
     ctx: &mut TxContext
 ): (Group, GroupAdminCap) {
@@ -163,6 +166,7 @@ public fun create_group(
         max_members,
         current_members: 0,
         telegram_group_id,
+        telegram_invite_link,
         report_count: 0,
         created_at: clock.timestamp_ms(),
     };
@@ -193,6 +197,7 @@ entry fun create_group_entry(
     subscription_period: u64,
     max_members: u64,
     telegram_group_id: String,
+    telegram_invite_link: String,
     clock: &Clock,
     ctx: &mut TxContext
 ) {
@@ -203,6 +208,7 @@ entry fun create_group_entry(
         subscription_period,
         max_members,
         telegram_group_id,
+        telegram_invite_link,
         clock,
         ctx
     );
@@ -530,6 +536,7 @@ public fun create_test_group(ctx: &mut TxContext, clock: &Clock): (Group, GroupA
         86400000,   // 1 day in ms
         100,
         b"test_telegram_id".to_string(),
+        b"https://t.me/+test_invite_link".to_string(),
         clock,
         ctx
     )

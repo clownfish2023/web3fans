@@ -8,6 +8,7 @@ export interface Group {
   maxMembers: number;
   currentMembers: number;
   telegramGroupId: string;
+  telegramInviteLink: string;
   reportCount: number;
   createdAt: number;
 }
@@ -39,6 +40,7 @@ export interface CreateGroupForm {
   subscriptionPeriod: number;
   maxMembers: number;
   telegramGroupId: string;
+  telegramInviteLink: string;
 }
 
 export interface PublishReportForm {

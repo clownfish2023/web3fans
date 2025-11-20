@@ -5,8 +5,9 @@ import { useContract } from '@/hooks/useContract';
 import { useTelegram } from '@/hooks/useTelegram';
 import { Group, Subscription } from '@/types';
 import { formatSui, formatDate, getRemainingTime, mistToSui } from '@/utils/sui';
+import { ReportList } from '@/components/ReportList';
 import { message, Modal, Input } from 'antd';
-import { Users, Calendar, DollarSign, FileText, Send } from 'lucide-react';
+import { Users, Calendar, DollarSign, FileText, Send, Plus } from 'lucide-react';
 
 export function GroupDetail() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -47,6 +48,7 @@ export function GroupDetail() {
           maxMembers: parseInt(fields.max_members),
           currentMembers: parseInt(fields.current_members),
           telegramGroupId: fields.telegram_group_id,
+          telegramInviteLink: fields.telegram_invite_link,
           reportCount: parseInt(fields.report_count),
           createdAt: parseInt(fields.created_at),
         });
@@ -132,8 +134,22 @@ export function GroupDetail() {
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-800 px-8 py-12">
-          <h1 className="text-3xl font-bold text-white mb-4">{group.name}</h1>
-          <p className="text-primary-100">{group.description}</p>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-white mb-4">{group.name}</h1>
+              <p className="text-primary-100">{group.description}</p>
+            </div>
+            {/* Publish Report Button (Owner Only) */}
+            {currentAccount && currentAccount.address === group.owner && (
+              <button
+                onClick={() => navigate(`/groups/${groupId}/publish`)}
+                className="flex items-center px-4 py-2 bg-white text-primary-600 rounded-lg font-medium hover:bg-primary-50 transition-colors ml-4"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Publish Report
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Group Info */}
@@ -215,7 +231,7 @@ export function GroupDetail() {
               <p className="text-lg font-medium">{group.telegramGroupId}</p>
             </div>
             <a
-              href={`https://t.me/${group.telegramGroupId.replace('@', '')}`}
+              href={group.telegramInviteLink}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -225,6 +241,14 @@ export function GroupDetail() {
             </a>
           </div>
         </div>
+      </div>
+
+      {/* Reports List */}
+      <div className="bg-white rounded-lg shadow-lg p-8 mt-6">
+        <ReportList 
+          groupId={groupId!} 
+          isSubscribed={!!userSubscription && userSubscription.expiresAt > Date.now()}
+        />
       </div>
 
       {/* Subscribe Modal */}

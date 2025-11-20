@@ -21,9 +21,12 @@
 - 管理群组成员
 
 ### 报告发布
+- 群组所有者可以发布研究报告
 - 发布报告摘要（免费公开）
 - 报告详情加密上传至 Walrus
 - 只有订阅用户可以访问详情
+- 支持多种文件格式（PDF, DOC, DOCX, TXT, MD）
+- 自动权限验证（GroupAdminCap）
 
 ### 订阅系统
 - 付费订阅群组
@@ -82,58 +85,24 @@ web3fans/
 - **Telegraf**：Telegram Bot SDK
 - **Walrus SDK**：去中心化存储
 
-## 快速开始
+## 🎉 合约已部署！
 
-### 1. 安装依赖
+✅ **Package ID**: `0x5a44c1c0846bfb666b4db5289f4f51683373668737a768bf8a16c87a867f0ae5` (V2 - 支持邀请链接)
 
-```bash
-# 安装前端依赖
-cd frontend
-npm install
+### 📖 查看快速开始指南
 
-# 安装后端依赖
-cd ../backend
-npm install
-```
+**[👉 点击这里查看 QUICK_START.md](QUICK_START.md)** - 详细的启动步骤
 
-### 2. 部署合约
+### 简要步骤
 
-```bash
-cd contracts
-sui move build
-sui client publish --gas-budget 100000000
-```
+1. **配置 Telegram Bot** (获取 token 并更新到 `backend/.env.local`)
+2. **安装依赖**: `npm install` (在 backend 和 frontend 目录)
+3. **启动服务**: 
+   - 后端: `cd backend && npm run dev`
+   - 前端: `cd frontend && npm run dev`
+4. **访问**: http://localhost:3000
 
-### 3. 配置环境变量
-
-创建 `backend/.env` 文件：
-
-```env
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-WALRUS_API_URL=https://walrus-testnet.mystenlabs.com
-SUI_NETWORK=testnet
-PACKAGE_ID=your_deployed_package_id
-```
-
-创建 `frontend/.env` 文件：
-
-```env
-VITE_SUI_NETWORK=testnet
-VITE_PACKAGE_ID=your_deployed_package_id
-VITE_API_URL=http://localhost:3001
-```
-
-### 4. 启动服务
-
-```bash
-# 启动后端
-cd backend
-npm run dev
-
-# 启动前端
-cd frontend
-npm run dev
-```
+详细信息请查看 [DEPLOYMENT_INFO_V2.md](DEPLOYMENT_INFO_V2.md)（V1 部署信息：[DEPLOYMENT_INFO.md](DEPLOYMENT_INFO.md)）
 
 ## 使用流程
 
@@ -234,11 +203,21 @@ MIT License
 
 ## 文档
 
-- 📖 [用户使用指南](USER_GUIDE.md) - 详细的使用说明
-- 🏗️ [系统架构文档](ARCHITECTURE.md) - 技术架构和设计
-- 🚀 [部署指南](DEPLOYMENT.md) - 完整的部署流程
-- 📡 [API 参考](API_REFERENCE.md) - 后端 API 文档
-- 🔐 [Seal & Walrus 集成说明](SEAL_WALRUS_INTEGRATION.md) - 详细的集成实现
+### 📖 使用指南
+- [快速开始指南](QUICK_START.md) - 立即开始使用
+- [用户使用指南](USER_GUIDE.md) - 详细的使用说明
+- [发布研报指南](docs/PUBLISH_REPORT_GUIDE.md) - 如何发布研究报告 ⭐ 新功能
+- [Seal + Walrus 使用指南](docs/SEAL_WALRUS_USAGE_GUIDE.md) - 完整技术实现 ⭐ 新增
+- [获取 Telegram 邀请链接](docs/HOW_TO_GET_TELEGRAM_INVITE_LINK.md)
+- [获取 Telegram Group ID](docs/HOW_TO_GET_TELEGRAM_GROUP_ID.md)
+- [SUI 金额说明](docs/SUI_AMOUNT_GUIDE.md)
+
+### 🏗️ 技术文档
+- [系统架构文档](ARCHITECTURE.md) - 技术架构和设计
+- [部署指南](DEPLOYMENT.md) - 完整的部署流程
+- [API 参考](API_REFERENCE.md) - 后端 API 文档
+- [Seal & Walrus 集成说明](SEAL_WALRUS_INTEGRATION.md) - 详细的集成实现
+- [故障排除](TROUBLESHOOTING.md) - 常见问题解决
 
 ## 快速开始脚本
 

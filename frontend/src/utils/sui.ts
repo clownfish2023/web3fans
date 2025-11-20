@@ -18,9 +18,11 @@ export function mistToSui(mist: bigint | string): number {
 /**
  * Format SUI amount for display
  */
-export function formatSui(mist: bigint | string, decimals = 2): string {
+export function formatSui(mist: bigint | string, decimals = 4): string {
   const sui = mistToSui(mist);
-  return sui.toFixed(decimals) + ' SUI';
+  // Remove trailing zeros
+  const formatted = sui.toFixed(decimals).replace(/\.?0+$/, '');
+  return formatted + ' SUI';
 }
 
 /**

@@ -13,17 +13,30 @@ export function CreateGroup() {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    subscriptionFee: 1,
+    subscriptionFee: 0.1,
     subscriptionPeriod: SUBSCRIPTION_PERIODS[2].value, // 30 days
     maxMembers: 0,
     telegramGroupId: '',
+    telegramInviteLink: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.description || !formData.telegramGroupId) {
+    if (!formData.name || !formData.description || !formData.telegramGroupId || !formData.telegramInviteLink) {
       message.error('Please fill in all required fields');
+      return;
+    }
+
+    // Validate subscription fee
+    if (formData.subscriptionFee < 0.001) {
+      message.error('Subscription fee must be at least 0.001 SUI');
+      return;
+    }
+
+    // Validate Telegram invite link format
+    if (!formData.telegramInviteLink.startsWith('https://t.me/')) {
+      message.error('Telegram invite link must start with https://t.me/');
       return;
     }
 
@@ -36,7 +49,8 @@ export function CreateGroup() {
         formData.subscriptionFee,
         formData.subscriptionPeriod,
         formData.maxMembers,
-        formData.telegramGroupId
+        formData.telegramGroupId,
+        formData.telegramInviteLink
       );
 
       message.success({ content: 'Group created successfully!', key: 'create' });
@@ -98,12 +112,16 @@ export function CreateGroup() {
             <input
               type="number"
               min="0"
-              step="0.1"
+              step="0.001"
               value={formData.subscriptionFee}
               onChange={(e) => setFormData({ ...formData, subscriptionFee: parseFloat(e.target.value) })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              placeholder="e.g., 0.001, 0.1, 1.0"
               required
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Minimum: 0.001 SUI (1,000,000 MIST)
+            </p>
           </div>
 
           <div>
@@ -139,21 +157,45 @@ export function CreateGroup() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Telegram Group ID *
-          </label>
-          <input
-            type="text"
-            value={formData.telegramGroupId}
-            onChange={(e) => setFormData({ ...formData, telegramGroupId: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            placeholder="@your_telegram_group"
-            required
-          />
-          <p className="mt-2 text-sm text-gray-500">
-            Enter your Telegram group username or ID
-          </p>
+        <div className="grid grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Telegram Group ID *
+            </label>
+            <input
+              type="text"
+              value={formData.telegramGroupId}
+              onChange={(e) => setFormData({ ...formData, telegramGroupId: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              placeholder="@your_telegram_group"
+              required
+            />
+            <p className="mt-2 text-sm text-gray-500">
+              Enter your Telegram group username or ID
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Telegram Invite Link *
+            </label>
+            <input
+              type="url"
+              value={formData.telegramInviteLink}
+              onChange={(e) => setFormData({ ...formData, telegramInviteLink: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              placeholder="https://t.me/+XxXxXxX"
+              required
+            />
+            <p className="mt-2 text-sm text-gray-500">
+              <a href="#" className="text-primary-600 hover:text-primary-700" onClick={(e) => {
+                e.preventDefault();
+                window.open('https://telegram.org/blog/invite-links', '_blank');
+              }}>
+                How to get invite link?
+              </a>
+            </p>
+          </div>
         </div>
 
         <div className="flex space-x-4">

@@ -2,7 +2,12 @@
 export const NETWORK = import.meta.env.VITE_SUI_NETWORK || 'testnet';
 
 // Contract configuration
-export const PACKAGE_ID = import.meta.env.VITE_PACKAGE_ID || '0x0';
+export const PACKAGE_ID = import.meta.env.VITE_PACKAGE_ID || '0x5a44c1c0846bfb666b4db5289f4f51683373668737a768bf8a16c87a867f0ae5';
+
+// Validate Package ID on load
+if (!PACKAGE_ID || PACKAGE_ID === '0x0') {
+  console.error('⚠️ PACKAGE_ID not configured! Please check your .env file');
+}
 
 // API configuration
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';

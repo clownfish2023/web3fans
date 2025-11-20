@@ -35,10 +35,11 @@ sealRouter.post('/store-key', async (req, res) => {
 
 /**
  * Retrieve encryption key from Seal
+ * Supports both subscriptionProof (legacy) and accessKeyId (new Seal pattern)
  */
 sealRouter.post('/retrieve-key', async (req, res) => {
   try {
-    const { keyId, subscriptionProof } = req.body;
+    const { keyId, subscriptionProof, accessKeyId } = req.body;
 
     if (!keyId) {
       return res.status(400).json({
@@ -47,8 +48,23 @@ sealRouter.post('/retrieve-key', async (req, res) => {
       });
     }
 
-    // Verify subscription proof (in production, this should verify on-chain)
-    // For now, we'll return the key if it exists
+    // Verify access via AccessKey NFT (Seal pattern)
+    if (accessKeyId) {
+      console.log(`🔍 Verifying access with AccessKey: ${accessKeyId}`);
+      
+      // TODO: Implement on-chain verification via AccessKey
+      // For now, we trust that the frontend has verified the AccessKey
+      // In production, this should:
+      // 1. Fetch AccessKey NFT from blockchain
+      // 2. Verify it matches the keyId namespace
+      // 3. Check expiration time
+    }
+    // Legacy: Verify subscription proof
+    else if (subscriptionProof) {
+      console.log('🔍 Using legacy subscription proof verification');
+    }
+
+    // Retrieve encryption key
     const encryptionKey = await sealService.retrieveKey(keyId);
 
     if (!encryptionKey) {
@@ -58,11 +74,11 @@ sealRouter.post('/retrieve-key', async (req, res) => {
       });
     }
 
+    console.log(`✅ Retrieved encryption key for keyId: ${JSON.stringify(keyId).substring(0, 50)}...`);
+
     res.json({
       success: true,
-      data: {
-        encryptionKey,
-      },
+      encryptionKey,
     });
   } catch (error) {
     console.error('Failed to retrieve key:', error);
