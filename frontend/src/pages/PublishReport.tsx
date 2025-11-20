@@ -5,6 +5,7 @@ import { useContract } from '@/hooks/useContract';
 import { Group } from '@/types';
 import { encryptFile, storeKeyInSeal, bytesToHex } from '@/utils/encryption';
 import { uploadEncryptedReport } from '@/services/walrus';
+import { uploadEncryptedReportViaBackend } from '@/services/walrus-backend';
 import { API_URL } from '@/config/constants';
 import { message } from 'antd';
 import { ArrowLeft, Upload, FileText, Lock } from 'lucide-react';
@@ -123,8 +124,19 @@ export function PublishReport() {
       setUploadProgress(30);
       message.loading({ content: 'Uploading to Walrus...', key: 'upload', duration: 0 });
       
-      const walrusBlobId = await uploadEncryptedReport(encryptedData.encryptedBlob, 100);
-      console.log('✅ Uploaded to Walrus:', walrusBlobId);
+      let walrusBlobId: string;
+      try {
+        // Try direct upload first
+        walrusBlobId = await uploadEncryptedReport(encryptedData.encryptedBlob, 100);
+        console.log('✅ Uploaded to Walrus (direct):', walrusBlobId);
+      } catch (directError) {
+        console.warn('Direct upload failed, trying via backend:', directError);
+        message.loading({ content: 'Retrying via backend...', key: 'upload', duration: 0 });
+        
+        // Fallback to backend proxy
+        walrusBlobId = await uploadEncryptedReportViaBackend(encryptedData.encryptedBlob, 100);
+        console.log('✅ Uploaded to Walrus (via backend):', walrusBlobId);
+      }
       
       setUploadProgress(70);
       

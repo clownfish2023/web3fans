@@ -5,75 +5,87 @@ export const walrusRouter = express.Router();
 const walrusService = new WalrusService();
 
 /**
- * Upload file to Walrus
+ * Upload file to Walrus via backend proxy
+ * This avoids CORS issues
  */
 walrusRouter.post('/upload', async (req, res) => {
   try {
-    const { content, epochs } = req.body;
-
-    if (!content) {
-      return res.status(400).json({
-        error: 'Missing required fields',
-        message: 'content is required',
-      });
-    }
-
-    const blobId = await walrusService.upload(content, epochs || 100);
-
-    res.json({
-      success: true,
-      data: {
-        blobId,
-      },
+    const chunks: Buffer[] = [];
+    
+    req.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    
+    req.on('end', async () => {
+      try {
+        const buffer = Buffer.concat(chunks);
+        const epochs = parseInt(req.query.epochs as string) || 100;
+        
+        console.log(`📤 Uploading file to Walrus (${buffer.length} bytes, ${epochs} epochs)`);
+        
+        const blobId = await walrusService.upload(buffer.toString('base64'), epochs);
+        
+        res.json({
+          success: true,
+          blobId,
+          size: buffer.length,
+        });
+      } catch (error) {
+        console.error('Failed to upload to Walrus:', error);
+        res.status(500).json({
+          error: 'Upload failed',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     });
   } catch (error) {
-    console.error('Failed to upload to Walrus:', error);
+    console.error('Upload error:', error);
     res.status(500).json({
-      error: 'Failed to upload to Walrus',
+      error: 'Upload failed',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
 
 /**
- * Download file from Walrus
+ * Download file from Walrus via backend proxy
  */
 walrusRouter.get('/download/:blobId', async (req, res) => {
   try {
     const { blobId } = req.params;
-
+    
+    console.log(`📥 Downloading file from Walrus (${blobId})`);
+    
     const content = await walrusService.download(blobId);
-
-    res.json({
-      success: true,
-      data: {
-        content,
-      },
-    });
+    
+    // Return as binary data
+    const buffer = Buffer.from(content, 'base64');
+    res.set('Content-Type', 'application/octet-stream');
+    res.send(buffer);
   } catch (error) {
-    console.error('Failed to download from Walrus:', error);
+    console.error('Download error:', error);
     res.status(500).json({
-      error: 'Failed to download from Walrus',
+      error: 'Download failed',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
 
 /**
- * Get blob info
+ * Get blob info from Walrus
  */
 walrusRouter.get('/info/:blobId', async (req, res) => {
   try {
     const { blobId } = req.params;
-
+    
     const info = await walrusService.getBlobInfo(blobId);
-
+    
     res.json({
       success: true,
-      data: info,
+      info,
     });
   } catch (error) {
-    console.error('Failed to get blob info:', error);
+    console.error('Get blob info error:', error);
     res.status(500).json({
       error: 'Failed to get blob info',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -81,3 +93,13 @@ walrusRouter.get('/info/:blobId', async (req, res) => {
   }
 });
 
+/**
+ * Health check
+ */
+walrusRouter.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'Walrus Proxy',
+    timestamp: new Date().toISOString(),
+  });
+});

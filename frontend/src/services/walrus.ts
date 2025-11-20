@@ -27,29 +27,46 @@ export interface WalrusUploadResponse {
 }
 
 /**
- * Upload file to Walrus
+ * Upload file to Walrus using the new /v1/quilt endpoint
+ * Reference: https://publisher.walrus-testnet.walrus.space/v1/api#tag/routes/operation/put_quilt
+ * Note: Direct upload may fail due to CORS or service availability
+ * Consider using backend proxy for production
  */
 export async function uploadToWalrus(
   file: Blob,
   epochs: number = 1
 ): Promise<WalrusUploadResponse> {
-  const response = await fetch(
-    `${WALRUS_PUBLISHER_URL}/v1/store?epochs=${epochs}`,
-    {
-      method: 'PUT',
-      body: file,
-      headers: {
-        'Content-Type': 'application/octet-stream',
-      },
+  try {
+    const response = await fetch(
+      `${WALRUS_PUBLISHER_URL}/v1/quilts?epochs=1&quilt_version=V1`,
+      {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Walrus upload failed:', error);
+      throw new Error(`Walrus service returned ${response.status}: ${error || response.statusText}`);
     }
-  );
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to upload to Walrus: ${error}`);
+    const result = await response.json();
+    console.log('✅ Walrus upload response:', result);
+    return result;
+  } catch (error: any) {
+    console.error('Walrus upload error:', error);
+    
+    // If CORS or network error, suggest using backend proxy
+    if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+      throw new Error('Cannot connect to Walrus directly. Please ensure backend is running or Walrus service is available.');
+    }
+    
+    throw error;
   }
-
-  return await response.json();
 }
 
 /**
