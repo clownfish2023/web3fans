@@ -35,9 +35,15 @@ export async function exportKeyBytes(key: CryptoKey): Promise<Uint8Array> {
  * Import key from raw bytes
  */
 export async function importKeyBytes(keyBytes: Uint8Array): Promise<CryptoKey> {
+  // Convert Uint8Array to ArrayBuffer for importKey
+  // Use slice to create a new ArrayBuffer to avoid SharedArrayBuffer issues
+  const buffer = new ArrayBuffer(keyBytes.byteLength);
+  const view = new Uint8Array(buffer);
+  view.set(keyBytes);
+  
   return await crypto.subtle.importKey(
     'raw',
-    keyBytes,
+    buffer,
     {
       name: 'AES-GCM',
       length: 256,

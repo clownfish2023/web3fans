@@ -31,6 +31,7 @@ export function GroupList() {
           maxMembers: 0,
           currentMembers: 0,
           telegramGroupId: parsedJson.telegram_group_id,
+          telegramInviteLink: parsedJson.telegram_invite_link || '',
           reportCount: 0,
           createdAt: event.timestampMs ? parseInt(event.timestampMs) : Date.now(),
         };

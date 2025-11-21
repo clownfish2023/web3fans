@@ -30,7 +30,7 @@ export const SUBSCRIPTION_PERIODS = [
   { label: '30 Days', value: ONE_MONTH_MS },
   { label: '90 Days', value: ONE_MONTH_MS * 3 },
   { label: '365 Days', value: ONE_MONTH_MS * 12 },
-] as const;
+];
 
 // SUI decimals
 export const SUI_DECIMALS = 9;

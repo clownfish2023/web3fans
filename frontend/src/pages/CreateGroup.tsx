@@ -43,7 +43,7 @@ export function CreateGroup() {
     try {
       message.loading({ content: 'Creating group...', key: 'create' });
       
-      const result = await createGroup(
+      await createGroup(
         formData.name,
         formData.description,
         formData.subscriptionFee,

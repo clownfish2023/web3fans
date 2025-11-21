@@ -33,7 +33,6 @@ export function PublishReportOnChain() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [estimatedCost, setEstimatedCost] = useState<bigint | null>(null);
   const [userBalance, setUserBalance] = useState<bigint | null>(null);
-  const [encryptedContent, setEncryptedContent] = useState<Uint8Array | null>(null);
 
   useEffect(() => {
     if (groupId && currentAccount) {
@@ -132,7 +131,7 @@ export function PublishReportOnChain() {
       
       try {
         const encryptedData = await encryptFile(file, groupId!);
-        setEncryptedContent(new Uint8Array(await encryptedData.encryptedBlob.arrayBuffer()));
+        // Encrypted content generated
         
         // Estimate storage cost (1 epoch for testnet)
         const cost = estimateWalrusStorageCost(encryptedData.encryptedBlob.size, 1);
@@ -392,7 +391,7 @@ export function PublishReportOnChain() {
                   <p className="text-gray-500">
                     Size: {(formData.contentFile.size / 1024 / 1024).toFixed(2)} MB
                   </p>
-                  {estimatedCost && (
+                  {estimatedCost !== null && (
                     <p className="text-primary-600 font-semibold mt-2">
                       💰 Estimated cost: {formatStorageCost(estimatedCost)}
                     </p>
@@ -409,14 +408,14 @@ export function PublishReportOnChain() {
           </div>
         </div>
 
-        {hasInsufficientBalance && (
+        {(hasInsufficientBalance === true) && estimatedCost !== null && userBalance !== null && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-start">
               <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
               <div>
                 <h3 className="text-sm font-semibold text-red-900 mb-1">Insufficient Balance</h3>
                 <p className="text-sm text-red-800">
-                  You need {formatStorageCost(estimatedCost!)} but only have {formatStorageCost(userBalance!)}.
+                  You need {formatStorageCost(estimatedCost)} but only have {formatStorageCost(userBalance)}.
                   Please add SUI to your wallet from the <a href="https://faucet.sui.io/" target="_blank" rel="noopener noreferrer" className="underline">testnet faucet</a>.
                 </p>
               </div>
@@ -443,7 +442,7 @@ export function PublishReportOnChain() {
           <div className="flex space-x-4">
             <button
               type="submit"
-              disabled={isLoading || !formData.title || !formData.summary || !formData.contentFile || hasInsufficientBalance}
+              disabled={isLoading || !formData.title || !formData.summary || !formData.contentFile || hasInsufficientBalance === true}
               className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? 'Publishing...' : 'Publish Report & Pay with Wallet'}
