@@ -5,7 +5,7 @@ export const walrusRouter = express.Router();
 const walrusService = new WalrusService();
 
 /**
- * Upload file to Walrus via backend proxy
+ * Upload file to Walrus via backend proxy using multipart/form-data
  * This avoids CORS issues
  */
 walrusRouter.post('/upload', async (req, res) => {
@@ -19,10 +19,13 @@ walrusRouter.post('/upload', async (req, res) => {
     req.on('end', async () => {
       try {
         const buffer = Buffer.concat(chunks);
-        const epochs = parseInt(req.query.epochs as string) || 100;
+        // Default to 1 epoch for testnet (Walrus testnet has strict limits)
+        // 1 epoch ≈ 1 day on testnet
+        const epochs = parseInt(req.query.epochs as string) || 1;
         
         console.log(`📤 Uploading file to Walrus (${buffer.length} bytes, ${epochs} epochs)`);
         
+        // Upload using multipart/form-data format
         const blobId = await walrusService.upload(buffer.toString('base64'), epochs);
         
         res.json({
@@ -30,11 +33,11 @@ walrusRouter.post('/upload', async (req, res) => {
           blobId,
           size: buffer.length,
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to upload to Walrus:', error);
         res.status(500).json({
           error: 'Upload failed',
-          message: error instanceof Error ? error.message : 'Unknown error',
+          message: error.response?.data || error.message || 'Unknown error',
         });
       }
     });

@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { Report } from '@/types';
-import { retrieveKeyFromSeal } from '@/utils/encryption';
+import { retrieveKeyFromSeal, decryptFile } from '@/utils/encryption';
 import { downloadFromWalrus } from '@/services/walrus';
-import { decryptFile } from '@/utils/encryption';
 import { API_URL } from '@/config/constants';
 import { message } from 'antd';
 import { ArrowLeft, Lock, FileText, Download, Eye } from 'lucide-react';
@@ -41,7 +40,7 @@ export function ViewReport() {
       
       if (result.data?.content && 'fields' in result.data.content) {
         const fields = result.data.content.fields as any;
-        setReport({
+        const reportData = {
           id: reportId,
           groupId: fields.group_id,
           title: fields.title,
@@ -50,7 +49,15 @@ export function ViewReport() {
           sealKeyId: fields.seal_key_id,
           publisher: fields.publisher,
           publishedAt: parseInt(fields.published_at),
+        };
+        
+        console.log('✅ Loaded report:', {
+          id: reportData.id,
+          walrusBlobId: reportData.walrusBlobId,
+          walrusBlobIdLength: reportData.walrusBlobId?.length,
         });
+        
+        setReport(reportData);
       }
     } catch (error) {
       console.error('Failed to load report:', error);
@@ -97,29 +104,41 @@ export function ViewReport() {
       message.loading({ content: 'Decrypting report...', key: 'decrypt', duration: 0 });
       
       // Step 1: Download encrypted file from Walrus
-      message.loading({ content: 'Downloading from Walrus...', key: 'decrypt', duration: 0 });
+      message.loading({ 
+        content: 'Downloading from Walrus...', 
+        key: 'decrypt', 
+        duration: 0 
+      });
+      
       const encryptedBlob = await downloadFromWalrus(report.walrusBlobId);
-      console.log('✅ Downloaded encrypted file:', encryptedBlob.size, 'bytes');
       
       // Step 2: Retrieve decryption key from Seal
       message.loading({ content: 'Retrieving decryption key...', key: 'decrypt', duration: 0 });
       const keyId = new Uint8Array(report.sealKeyId);
       const encryptionKey = await retrieveKeyFromSeal(keyId, accessKeyId, API_URL);
-      console.log('✅ Retrieved encryption key');
       
       // Step 3: Decrypt the file
       message.loading({ content: 'Decrypting content...', key: 'decrypt', duration: 0 });
       const decrypted = await decryptFile(encryptedBlob, encryptionKey);
-      console.log('✅ Decrypted file:', decrypted.size, 'bytes');
       
       setDecryptedBlob(decrypted);
       message.success({ content: 'Report decrypted successfully!', key: 'decrypt', duration: 2 });
     } catch (error: any) {
-      console.error('Failed to decrypt report:', error);
+      
+      let errorMessage = 'Failed to decrypt report';
+      
+      if (error.message.includes('404') || error.message.includes('Not Found')) {
+        errorMessage = 'File not found on Walrus. The blob might not be synced yet. Please try again in a few seconds.';
+      } else if (error.message.includes('Failed to download')) {
+        errorMessage = `Download failed: ${error.message}. Check console for details.`;
+      } else {
+        errorMessage = `Error: ${error.message}`;
+      }
+      
       message.error({ 
-        content: `Failed to decrypt report: ${error.message}`, 
+        content: errorMessage, 
         key: 'decrypt',
-        duration: 5 
+        duration: 8 
       });
     } finally {
       setDecrypting(false);

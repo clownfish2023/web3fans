@@ -1,4 +1,5 @@
 import axios from 'axios';
+import FormData from 'form-data';
 
 /**
  * Walrus Service for decentralized storage
@@ -15,24 +16,52 @@ export class WalrusService {
   }
 
   /**
-   * Upload content to Walrus using the new /v1/quilt endpoint
+   * Upload content to Walrus using the new /v1/quilts endpoint with multipart/form-data
    * Reference: https://publisher.walrus-testnet.walrus.space/v1/api#tag/routes/operation/put_quilt
+   * 
+   * @param content - Base64 encoded file content
+   * @param epochs - Storage duration (Testnet typically allows 1-5 epochs, 1 epoch ≈ 1 day)
+   * @returns Walrus blob ID
    */
-  async upload(content: string, epochs: number = 100): Promise<string> {
+  async upload(content: string, epochs: number = 1): Promise<string> {
     try {
+      const formData = new FormData();
+      
+      // Convert base64 content to Buffer
+      const buffer = Buffer.from(content, 'base64');
+      formData.append('file', buffer, {
+        filename: 'encrypted-report.bin',
+        contentType: 'application/octet-stream',
+      });
+      
       const response = await axios.put(
-        `${this.publisherUrl}/v1/quilt?epochs=${epochs}`,
-        content,
+        `${this.publisherUrl}/v1/quilts?epochs=${epochs}&quilt_version=V1`,
+        formData,
         {
           headers: {
-            'Content-Type': 'application/octet-stream',
+            ...formData.getHeaders(),
           },
         }
       );
 
       const data = response.data;
       
-      // Handle new Walrus API response format
+      // Handle new Walrus API response format with blobStoreResult
+      if (data.blobStoreResult) {
+        const blobStore = data.blobStoreResult;
+        
+        if (blobStore.newlyCreated) {
+          const blobId = blobStore.newlyCreated.blobObject.blobId;
+          console.log(`✅ Uploaded to Walrus (newly created): ${blobId}`);
+          return blobId;
+        } else if (blobStore.alreadyCertified) {
+          const blobId = blobStore.alreadyCertified.blobId;
+          console.log(`✅ Already in Walrus (certified): ${blobId}`);
+          return blobId;
+        }
+      }
+      
+      // Fallback: check old structure
       if (data.newlyCreated) {
         const blobId = data.newlyCreated.blobObject.blobId;
         console.log(`✅ Uploaded to Walrus (newly created): ${blobId}`);
@@ -43,7 +72,7 @@ export class WalrusService {
         return blobId;
       }
 
-      // Fallback: try to extract blobId from any available field
+      // Last resort: try to extract blobId from any available field
       const blobId = data.blobId || data.id;
       if (blobId) {
         console.log(`✅ Uploaded to Walrus: ${blobId}`);

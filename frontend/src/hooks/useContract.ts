@@ -127,7 +127,7 @@ export function useContract() {
           tx.pure.string(title),
           tx.pure.string(summary),
           tx.pure.string(walrusBlobId),
-          tx.pure(new Uint8Array(sealKeyId)),
+          tx.pure.vector('u8', sealKeyId),  // Use vector builder
           tx.object(clockId),
         ],
       });

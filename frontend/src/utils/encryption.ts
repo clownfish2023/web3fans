@@ -107,28 +107,38 @@ export async function decryptFile(
   encryptedBlob: Blob,
   encryptionKey: Uint8Array
 ): Promise<Blob> {
-  // Read encrypted data
-  const encryptedBuffer = await encryptedBlob.arrayBuffer();
-  const encryptedData = new Uint8Array(encryptedBuffer);
-  
-  // Extract IV (first 12 bytes) and ciphertext
-  const iv = encryptedData.slice(0, 12);
-  const ciphertext = encryptedData.slice(12);
-  
-  // Import key
-  const key = await importKeyBytes(encryptionKey);
-  
-  // Decrypt
-  const decrypted = await crypto.subtle.decrypt(
-    {
-      name: 'AES-GCM',
-      iv: iv,
-    },
-    key,
-    ciphertext
-  );
-  
-  return new Blob([decrypted]);
+  try {
+    // Read encrypted data
+    const encryptedBuffer = await encryptedBlob.arrayBuffer();
+    const encryptedData = new Uint8Array(encryptedBuffer);
+    
+    if (encryptedData.length < 12) {
+      throw new Error('Invalid encrypted data: too short (missing IV)');
+    }
+    
+    const iv = encryptedData.slice(0, 12);
+    const ciphertext = encryptedData.slice(12);
+    
+    // Import key
+    const key = await importKeyBytes(encryptionKey);
+    
+    // Decrypt
+    const decrypted = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: iv,
+      },
+      key,
+      ciphertext
+    );
+    
+    return new Blob([decrypted], { type: 'application/octet-stream' });
+  } catch (error: any) {
+    if (error.name === 'OperationError') {
+      throw new Error('Decryption failed: The encryption key is incorrect or the file is corrupted.');
+    }
+    throw error;
+  }
 }
 
 /**
@@ -178,6 +188,8 @@ export async function storeKeyInSeal(
   encryptionKey: Uint8Array,
   apiUrl: string
 ): Promise<void> {
+  const keyBase64 = bytesToBase64(encryptionKey);
+  
   const response = await fetch(`${apiUrl}/seal/store-key`, {
     method: 'POST',
     headers: {
@@ -185,7 +197,7 @@ export async function storeKeyInSeal(
     },
     body: JSON.stringify({
       keyId: Array.from(keyId),
-      encryptionKey: bytesToBase64(encryptionKey),
+      encryptionKey: keyBase64,
     }),
   });
   

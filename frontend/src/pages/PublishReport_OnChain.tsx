@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useCurrentAccount } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { useContract } from '@/hooks/useContract';
 import { Group } from '@/types';
-import { encryptFile, storeKeyInSeal } from '@/utils/encryption';
-import { uploadEncryptedReport } from '@/services/walrus';
+import { encryptFile, storeKeyInSeal, bytesToHex } from '@/utils/encryption';
+import { 
+  createWalrusStoreTransaction, 
+  extractBlobIdFromTxResult,
+  estimateWalrusStorageCost,
+  formatStorageCost,
+  checkSufficientBalance 
+} from '@/services/walrus-onchain';
 import { API_URL } from '@/config/constants';
 import { message } from 'antd';
-import { ArrowLeft, Upload, FileText, Lock } from 'lucide-react';
+import { ArrowLeft, Upload, FileText, Lock, Wallet, AlertCircle } from 'lucide-react';
 
-export function PublishReport() {
+export function PublishReportOnChain() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const { mutateAsync: signAndExecuteTransaction } = useSignAndExecuteTransaction();
   const { getGroup, getUserAdminCaps, publishReport, isLoading } = useContract();
   
   const [group, setGroup] = useState<Group | null>(null);
@@ -23,11 +31,15 @@ export function PublishReport() {
     contentFile: null as File | null,
   });
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [estimatedCost, setEstimatedCost] = useState<bigint | null>(null);
+  const [userBalance, setUserBalance] = useState<bigint | null>(null);
+  const [encryptedContent, setEncryptedContent] = useState<Uint8Array | null>(null);
 
   useEffect(() => {
     if (groupId && currentAccount) {
       loadGroup();
       loadAdminCap();
+      loadUserBalance();
     }
   }, [groupId, currentAccount]);
 
@@ -56,7 +68,6 @@ export function PublishReport() {
         
         setGroup(groupData);
 
-        // Check if current user is the owner
         if (currentAccount && currentAccount.address !== fields.owner) {
           message.error('Only group owner can publish reports');
           navigate(`/groups/${groupId}`);
@@ -73,8 +84,6 @@ export function PublishReport() {
     
     try {
       const adminCaps = await getUserAdminCaps(currentAccount.address);
-      
-      // Find the admin cap for this group
       const matchingCap = adminCaps.find((cap: any) => {
         const fields = cap.data?.content?.fields;
         return fields?.group_id === groupId;
@@ -83,7 +92,7 @@ export function PublishReport() {
       if (matchingCap && matchingCap.data) {
         setAdminCapId(matchingCap.data.objectId);
       } else {
-        message.error('GroupAdminCap not found. You need the admin capability to publish reports.');
+        message.error('GroupAdminCap not found');
         navigate(`/groups/${groupId}`);
       }
     } catch (error) {
@@ -92,7 +101,21 @@ export function PublishReport() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const loadUserBalance = async () => {
+    if (!currentAccount) return;
+    
+    try {
+      const balance = await suiClient.getBalance({
+        owner: currentAccount.address,
+        coinType: '0x2::sui::SUI',
+      });
+      setUserBalance(BigInt(balance.totalBalance));
+    } catch (error) {
+      console.error('Failed to load balance:', error);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
@@ -103,31 +126,101 @@ export function PublishReport() {
       }
       
       setFormData({ ...formData, contentFile: file });
+      
+      // Encrypt file and estimate cost
+      message.loading({ content: 'Encrypting file...', key: 'encrypt', duration: 0 });
+      
+      try {
+        const encryptedData = await encryptFile(file, groupId!);
+        setEncryptedContent(new Uint8Array(await encryptedData.encryptedBlob.arrayBuffer()));
+        
+        // Estimate storage cost (1 epoch for testnet)
+        const cost = estimateWalrusStorageCost(encryptedData.encryptedBlob.size, 1);
+        setEstimatedCost(cost);
+        
+        message.success({ 
+          content: `File encrypted! Estimated cost: ${formatStorageCost(cost)}`, 
+          key: 'encrypt',
+          duration: 3 
+        });
+        
+        console.log('💰 Estimated storage cost:', formatStorageCost(cost));
+      } catch (error: any) {
+        message.error({ content: `Encryption failed: ${error.message}`, key: 'encrypt' });
+      }
     }
   };
 
-  const uploadToWalrus = async (file: File): Promise<{ walrusBlobId: string; sealKeyId: number[] }> => {
+  const uploadToWalrusOnChain = async (file: File): Promise<{ walrusBlobId: string; sealKeyId: number[] }> => {
     try {
-      // Step 1: Encrypt file (10%)
+      // Step 1: Encrypt file
       setUploadProgress(10);
-      message.loading({ content: 'Encrypting file with Seal...', key: 'upload', duration: 0 });
+      message.loading({ content: '🔐 Encrypting file with Seal...', key: 'upload', duration: 0 });
       
       const encryptedData = await encryptFile(file, groupId!);
+      const encryptedBytes = new Uint8Array(await encryptedData.encryptedBlob.arrayBuffer());
       
-      // Step 2: Upload to Walrus (30% - 70%)
-      setUploadProgress(30);
-      message.loading({ content: 'Uploading to Walrus...', key: 'upload', duration: 0 });
+      console.log('✅ File encrypted', {
+        originalSize: file.size,
+        encryptedSize: encryptedBytes.length,
+        keyId: bytesToHex(encryptedData.keyId),
+      });
       
-      const walrusBlobId = await uploadEncryptedReport(encryptedData.encryptedBlob, 1);
+      // Step 2: Check user balance
+      setUploadProgress(20);
+      message.loading({ content: '💰 Checking wallet balance...', key: 'upload', duration: 0 });
+      
+      // Use 1 epoch for testnet
+      const estimatedCost = estimateWalrusStorageCost(encryptedBytes.length, 1);
+      const { sufficient, currentBalance } = await checkSufficientBalance(
+        suiClient,
+        currentAccount!.address,
+        estimatedCost
+      );
+      
+      if (!sufficient) {
+        throw new Error(
+          `Insufficient balance. Need ${formatStorageCost(estimatedCost)}, ` +
+          `but you have ${formatStorageCost(currentBalance)}`
+        );
+      }
+      
+      console.log('✅ Balance check passed', {
+        required: formatStorageCost(estimatedCost),
+        available: formatStorageCost(currentBalance),
+      });
+      
+      // Step 3: Create and sign transaction
+      setUploadProgress(40);
+      message.loading({ content: '📝 Creating Walrus storage transaction...', key: 'upload', duration: 0 });
+      
+      // Use 1 epoch for testnet (Walrus testnet has strict limits)
+      const tx = createWalrusStoreTransaction(encryptedBytes, 1);
+      
+      // Step 4: User signs and executes transaction
+      setUploadProgress(50);
+      message.loading({ content: '✍️ Please sign the transaction in your wallet...', key: 'upload', duration: 0 });
+      
+      const result = await signAndExecuteTransaction({
+        transaction: tx,
+      });
+      
+      console.log('✅ Transaction executed:', result);
+      
+      // Step 5: Extract blob ID from transaction result
       setUploadProgress(70);
+      message.loading({ content: '🔍 Extracting blob ID...', key: 'upload', duration: 0 });
       
-      // Step 3: Store encryption key in Seal service (90%)
-      message.loading({ content: 'Storing encryption key...', key: 'upload', duration: 0 });
+      const walrusBlobId = extractBlobIdFromTxResult(result);
+      console.log('✅ Walrus blob ID:', walrusBlobId);
+      
+      // Step 6: Store encryption key in Seal service
+      setUploadProgress(85);
+      message.loading({ content: '🔑 Storing encryption key in Seal...', key: 'upload', duration: 0 });
       
       await storeKeyInSeal(encryptedData.keyId, encryptedData.encryptionKey, API_URL);
-      setUploadProgress(90);
+      console.log('✅ Encryption key stored in Seal');
       
-      // Step 4: Done (100%)
       setUploadProgress(100);
       message.destroy('upload');
       
@@ -136,6 +229,7 @@ export function PublishReport() {
         sealKeyId: Array.from(encryptedData.keyId),
       };
     } catch (error: any) {
+      console.error('❌ Upload failed:', error);
       throw new Error(`Upload failed: ${error.message}`);
     }
   };
@@ -154,11 +248,11 @@ export function PublishReport() {
     }
 
     try {
-      // Step 1: Upload file to Walrus (with encryption)
-      const { walrusBlobId, sealKeyId } = await uploadToWalrus(formData.contentFile);
+      // Step 1: Upload file to Walrus (on-chain with user wallet payment)
+      const { walrusBlobId, sealKeyId } = await uploadToWalrusOnChain(formData.contentFile);
       
       // Step 2: Publish report on-chain
-      message.loading({ content: 'Publishing report on-chain...', key: 'publish', duration: 0 });
+      message.loading({ content: '📤 Publishing report metadata on Sui...', key: 'publish', duration: 0 });
       
       await publishReport(
         groupId,
@@ -169,12 +263,10 @@ export function PublishReport() {
         sealKeyId
       );
 
-      message.success({ content: 'Report published successfully! 🎉', key: 'publish', duration: 3 });
+      message.success({ content: '🎉 Report published successfully!', key: 'publish', duration: 3 });
       
-      // Reset progress
       setUploadProgress(0);
       
-      // Navigate back to group detail
       setTimeout(() => {
         navigate(`/groups/${groupId}`);
       }, 1000);
@@ -200,6 +292,8 @@ export function PublishReport() {
     );
   }
 
+  const hasInsufficientBalance = estimatedCost && userBalance && userBalance < estimatedCost;
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
@@ -211,10 +305,27 @@ export function PublishReport() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Group
         </button>
-        <h1 className="text-3xl font-bold text-gray-900">Publish Report</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Publish Report (On-Chain Upload)</h1>
         <p className="text-gray-600 mt-2">
           Group: {group.name}
         </p>
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <Wallet className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-900 mb-1">💎 On-Chain Storage with User Wallet</h3>
+              <p className="text-sm text-blue-800">
+                Files are stored on Walrus using Sui blockchain transactions. 
+                You will pay for storage directly from your wallet using SUI tokens.
+              </p>
+              {userBalance !== null && (
+                <p className="text-sm text-blue-700 mt-2">
+                  Your balance: {formatStorageCost(userBalance)}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Form */}
@@ -245,9 +356,6 @@ export function PublishReport() {
             placeholder="Write a brief summary that will be visible to everyone. Subscribers can view the full report."
             required
           />
-          <p className="mt-2 text-sm text-gray-500">
-            💡 This summary will be visible to all users. Only subscribers can access the full report.
-          </p>
         </div>
 
         <div>
@@ -264,7 +372,7 @@ export function PublishReport() {
                 )}
               </div>
               <div className="flex text-sm text-gray-600">
-                <label className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500">
+                <label className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500">
                   <span>{formData.contentFile ? 'Change file' : 'Upload a file'}</span>
                   <input
                     type="file"
@@ -284,6 +392,11 @@ export function PublishReport() {
                   <p className="text-gray-500">
                     Size: {(formData.contentFile.size / 1024 / 1024).toFixed(2)} MB
                   </p>
+                  {estimatedCost && (
+                    <p className="text-primary-600 font-semibold mt-2">
+                      💰 Estimated cost: {formatStorageCost(estimatedCost)}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -291,15 +404,30 @@ export function PublishReport() {
           <div className="mt-2 flex items-start">
             <Lock className="w-4 h-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
             <p className="text-sm text-gray-600">
-              The full report will be encrypted and stored on Walrus. Only subscribers with valid access keys can decrypt and view it.
+              The file will be encrypted and stored on-chain. You pay for storage from your wallet.
             </p>
           </div>
         </div>
 
+        {hasInsufficientBalance && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-red-600 mr-3 mt-0.5 flex-shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-red-900 mb-1">Insufficient Balance</h3>
+                <p className="text-sm text-red-800">
+                  You need {formatStorageCost(estimatedCost!)} but only have {formatStorageCost(userBalance!)}.
+                  Please add SUI to your wallet from the <a href="https://faucet.sui.io/" target="_blank" rel="noopener noreferrer" className="underline">testnet faucet</a>.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {uploadProgress > 0 && uploadProgress < 100 && (
           <div>
             <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Uploading to Walrus...</span>
+              <span>Processing...</span>
               <span>{uploadProgress}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -315,10 +443,10 @@ export function PublishReport() {
           <div className="flex space-x-4">
             <button
               type="submit"
-              disabled={isLoading || !formData.title || !formData.summary || !formData.contentFile}
+              disabled={isLoading || !formData.title || !formData.summary || !formData.contentFile || hasInsufficientBalance}
               className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? 'Publishing...' : 'Publish Report'}
+              {isLoading ? 'Publishing...' : 'Publish Report & Pay with Wallet'}
             </button>
             <button
               type="button"
@@ -331,15 +459,16 @@ export function PublishReport() {
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-blue-900 mb-2">📝 Publishing Process</h3>
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">📝 On-Chain Publishing Process</h3>
           <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-            <li>Report content will be encrypted using Seal</li>
-            <li>Encrypted file will be stored on Walrus (decentralized storage)</li>
-            <li>Metadata will be recorded on Sui blockchain</li>
-            <li>Only valid subscribers can access and decrypt the full report</li>
+            <li>File is encrypted using Seal</li>
+            <li><strong>You sign a transaction to store on Walrus (pays from your wallet)</strong></li>
+            <li>Encrypted file is stored on Walrus network</li>
+            <li>Encryption key is stored in Seal service</li>
+            <li>Report metadata is published on Sui blockchain</li>
           </ol>
-          <p className="text-sm text-blue-700 mt-3">
-            💡 Want to use your wallet to pay for storage? Try <a href={`/groups/${groupId}/publish-onchain`} className="underline font-medium">On-Chain Upload</a>.
+          <p className="text-sm text-blue-700 mt-3 font-medium">
+            💡 This is the most decentralized approach - you control the payment!
           </p>
         </div>
       </form>

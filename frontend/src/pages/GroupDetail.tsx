@@ -112,7 +112,12 @@ export function GroupDetail() {
       );
 
       setIsSubscribeModalOpen(false);
-      loadUserSubscription();
+      
+      // Refresh both group info and subscription status
+      await Promise.all([
+        loadGroup(),
+        loadUserSubscription()
+      ]);
     } catch (error) {
       console.error('Failed to subscribe:', error);
       message.error({ content: 'Subscription failed, please try again', key: 'subscribe' });
