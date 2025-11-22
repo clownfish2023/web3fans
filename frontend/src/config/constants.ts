@@ -10,7 +10,8 @@ if (!PACKAGE_ID || PACKAGE_ID === '0x0') {
 }
 
 // API configuration
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export const API_URL = rawApiUrl.replace(/\/$/, '');
 
 // Walrus configuration
 export const WALRUS_PUBLISHER_URL = import.meta.env.VITE_WALRUS_PUBLISHER_URL || 
