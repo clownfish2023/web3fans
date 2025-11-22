@@ -137,16 +137,17 @@ export function ViewReport() {
              console.log(`   -> Type: ${obj.data.type}`);
           }
 
-          // Strict Type Check: Ensure it is an AccessKey
-          if (!obj.data.type || !obj.data.type.includes('::group::AccessKey')) {
+          // Strict Type Check: Ensure it is an AccessKey or Subscription
+          // We accept both 'AccessKey' and 'Subscription' to match the actual contract types
+          if (!obj.data.type || (!obj.data.type.includes('::group::AccessKey') && !obj.data.type.includes('::group::Subscription'))) {
              if (isIdMatch) {
-                 console.log(`   -> ❌ Rejected: Object is not an AccessKey (Type mismatch)`);
+                 console.log(`   -> ❌ Rejected: Object is not a valid Subscription/AccessKey (Type mismatch)`);
              }
              return false;
           }
           
           if (isIdMatch) {
-              console.log(`   -> ✅ Accepted: Valid AccessKey found`);
+              console.log(`   -> ✅ Accepted: Valid Subscription/AccessKey found`);
           }
 
           return isIdMatch;
