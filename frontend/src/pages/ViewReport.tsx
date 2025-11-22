@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
+import { normalizeSuiObjectId } from '@mysten/sui/utils';
 import { Report } from '@/types';
 import { retrieveKeyFromSeal, decryptFile } from '@/utils/encryption';
 import { downloadFromWalrus, readJsonFromWalrus } from '@/services/walrus';
@@ -105,32 +106,58 @@ export function ViewReport() {
   const findAccessKey = async () => {
     if (!currentAccount || !report) return;
     
+    console.log('🔍 Checking subscription for Group ID:', report.groupId);
+    
     try {
-      // Find user's AccessKey NFTs
-      const objects = await client.getOwnedObjects({
-        owner: currentAccount.address,
-        options: {
-          showContent: true,
-        },
-      });
+      let hasNextPage = true;
+      let nextCursor = null;
+      let foundKey = null;
+
+      // Pagination loop to find AccessKey
+      while (hasNextPage && !foundKey) {
+        const response: any = await client.getOwnedObjects({
+          owner: currentAccount.address,
+          cursor: nextCursor,
+          options: {
+            showContent: true,
+            showType: true,
+          },
+        });
+
+        const accessKey = response.data.find((obj: any) => {
+          const fields = obj.data?.content?.fields;
+          if (!fields) return false;
+          
+          // Simple heuristic: check if it has group_id field
+          const objGroupId = fields.group_id;
+          if (!objGroupId) return false;
+
+          // Normalize IDs for comparison
+          return normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId);
+        });
+
+        if (accessKey) {
+          foundKey = accessKey;
+        }
+
+        hasNextPage = response.hasNextPage;
+        nextCursor = response.nextCursor;
+      }
       
-      // Find matching AccessKey for this report's group
-      const accessKey = objects.data.find((obj: any) => {
-        const fields = obj.data?.content?.fields;
-        return fields && fields.group_id === report.groupId;
-      });
-      
-      if (accessKey && accessKey.data) {
-        setAccessKeyId(accessKey.data.objectId);
+      if (foundKey && foundKey.data) {
+        console.log('✅ Found valid AccessKey:', foundKey.data.objectId);
+        setAccessKeyId(foundKey.data.objectId);
         
         // Get expiry time from AccessKey
-        if (accessKey.data.content && 'fields' in accessKey.data.content) {
-          const fields = accessKey.data.content.fields as any;
+        if (foundKey.data.content && 'fields' in foundKey.data.content) {
+          const fields = foundKey.data.content.fields as any;
           if (fields.expires_at) {
             const expiresAt = parseInt(fields.expires_at);
             setSubscriptionExpiry(expiresAt);
           }
         }
+      } else {
+        console.log('❌ No active subscription found for this group.');
       }
     } catch (error) {
       console.error('Failed to find access key:', error);
