@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCurrentAccount } from '@mysten/dapp-kit';
 import { useContract } from '@/hooks/useContract';
-import { useTelegram } from '@/hooks/useTelegram';
 import { Group } from '@/types';
 import { encryptFile, storeKeyInSeal } from '@/utils/encryption';
 import { uploadEncryptedReport, uploadJsonToWalrus } from '@/services/walrus';
@@ -16,7 +15,6 @@ export function PublishReport() {
   const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
   const { getGroup, getUserAdminCaps, publishReport, isLoading } = useContract();
-  const { sendTelegramNotification } = useTelegram();
   
   const [group, setGroup] = useState<Group | null>(null);
   const [adminCapId, setAdminCapId] = useState<string>('');
