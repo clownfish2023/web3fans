@@ -91,18 +91,68 @@ export class WalrusService {
    * Download content from Walrus
    */
   async download(blobId: string): Promise<string> {
-    try {
-      const response = await axios.get(
-        `${this.aggregatorUrl}/v1/${blobId}`,
-        {
-          responseType: 'text',
-        }
-      );
+    // Try multiple endpoints to handle different ID types (Blob ID vs Quilt Patch ID)
+    const endpoints = [
+      `${this.aggregatorUrl}/v1/${blobId}`,
+      `${this.aggregatorUrl}/v1/blobs/${blobId}`,
+      // If it's a Quilt Patch ID, this endpoint is required
+      `${this.aggregatorUrl}/v1/blobs/by-quilt-patch-id/${blobId}`
+    ];
 
-      console.log(`✅ Downloaded from Walrus: ${blobId}`);
-      return response.data;
+    let lastError: any = null;
+
+    for (const url of endpoints) {
+      try {
+        // console.log(`[DEBUG] Trying Walrus endpoint: ${url}`);
+        const response = await axios.get(url, { responseType: 'text' });
+        
+        console.log(`✅ Downloaded from Walrus: ${blobId}`);
+        console.log(`[DEBUG] Response headers:`, response.headers);
+        console.log(`[DEBUG] Response status:`, response.status);
+        console.log(`[DEBUG] Response data length:`, response.data ? response.data.length : 0);
+        
+        return response.data;
+      } catch (error: any) {
+        lastError = error;
+        // If 404, it might be the wrong endpoint type, so continue to next
+        if (error.response && error.response.status === 404) {
+          continue;
+        }
+        // For other errors (500, network), maybe still try others but log it
+        // console.warn(`Endpoint failed: ${url}, error: ${error.message}`);
+      }
+    }
+
+    // If we get here, all endpoints failed
+    console.error(`Failed to download from Walrus after trying all endpoints for ID: ${blobId}`);
+    if (lastError) throw lastError;
+    throw new Error('Walrus download failed');
+  }
+
+  /**
+   * Read JSON content from Walrus
+   */
+  async readJson<T = any>(blobId: string): Promise<T> {
+    try {
+      const content = await this.download(blobId);
+      
+      // Handle empty content (sometimes Walrus returns 200 OK but empty body during propagation)
+      if (!content || (typeof content === 'string' && content.trim().length === 0)) {
+        console.warn(`[DEBUG] Downloaded content is empty for ID: ${blobId}`);
+        throw new Error('Downloaded content is empty');
+      }
+
+      // If axios automatically parsed JSON
+      if (typeof content === 'object') return content as T;
+      
+      try {
+        return JSON.parse(content) as T;
+      } catch (parseError) {
+        console.error(`[DEBUG] Failed to parse content: "${content.substring(0, 100)}..."`);
+        throw parseError;
+      }
     } catch (error) {
-      console.error('Failed to download from Walrus:', error);
+      console.error('Failed to read/parse JSON from Walrus:', error);
       throw error;
     }
   }

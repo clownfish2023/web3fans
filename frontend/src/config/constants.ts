@@ -19,12 +19,17 @@ export const WALRUS_AGGREGATOR_URL = import.meta.env.VITE_WALRUS_AGGREGATOR_URL 
   'https://aggregator.walrus-testnet.walrus.space';
 
 // Time constants
+export const ONE_MINUTE_MS = 60000;
+export const ONE_HOUR_MS = 3600000;
 export const ONE_DAY_MS = 86400000;
 export const ONE_WEEK_MS = 604800000;
 export const ONE_MONTH_MS = 2592000000;
 
 // Subscription periods (in milliseconds)
 export const SUBSCRIPTION_PERIODS = [
+  { label: '5 Minutes', value: ONE_MINUTE_MS * 5 },
+  { label: '30 Minutes', value: ONE_MINUTE_MS * 30 },
+  { label: '1 Hour', value: ONE_HOUR_MS },
   { label: '1 Day', value: ONE_DAY_MS },
   { label: '7 Days', value: ONE_WEEK_MS },
   { label: '30 Days', value: ONE_MONTH_MS },

@@ -2,18 +2,21 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCurrentAccount } from '@mysten/dapp-kit';
 import { useContract } from '@/hooks/useContract';
+import { useTelegram } from '@/hooks/useTelegram';
 import { Group } from '@/types';
 import { encryptFile, storeKeyInSeal } from '@/utils/encryption';
-import { uploadEncryptedReport } from '@/services/walrus';
+import { uploadEncryptedReport, uploadJsonToWalrus } from '@/services/walrus';
 import { API_URL } from '@/config/constants';
 import { message } from 'antd';
 import { ArrowLeft, Upload, FileText, Lock } from 'lucide-react';
+import axios from 'axios';
 
 export function PublishReport() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const currentAccount = useCurrentAccount();
   const { getGroup, getUserAdminCaps, publishReport, isLoading } = useContract();
+  const { sendTelegramNotification } = useTelegram();
   
   const [group, setGroup] = useState<Group | null>(null);
   const [adminCapId, setAdminCapId] = useState<string>('');
@@ -106,7 +109,7 @@ export function PublishReport() {
     }
   };
 
-  const uploadToWalrus = async (file: File): Promise<{ walrusBlobId: string; sealKeyId: number[] }> => {
+  const uploadToWalrus = async (file: File): Promise<{ contentBlobId: string; manifestBlobId: string; sealKeyId: number[] }> => {
     try {
       // Step 1: Encrypt file (10%)
       setUploadProgress(10);
@@ -114,25 +117,40 @@ export function PublishReport() {
       
       const encryptedData = await encryptFile(file, groupId!);
       
-      // Step 2: Upload to Walrus (30% - 70%)
+      // Step 2: Upload Content to Walrus (30% - 50%)
       setUploadProgress(30);
-      message.loading({ content: 'Uploading to Walrus...', key: 'upload', duration: 0 });
+      message.loading({ content: 'Uploading encrypted content to Walrus...', key: 'upload', duration: 0 });
       
-      const walrusBlobId = await uploadEncryptedReport(encryptedData.encryptedBlob, 1);
+      const contentBlobId = await uploadEncryptedReport(encryptedData.encryptedBlob, 1);
+      setUploadProgress(50);
+      
+      // Step 3: Upload Manifest to Walrus (50% - 70%)
+      message.loading({ content: 'Uploading manifest to Walrus...', key: 'upload', duration: 0 });
+      
+      const manifest = {
+        title: formData.title,
+        summary: formData.summary,
+        imageUrl: 'https://assets.staticimg.com/cms/media/3gLd055qS5548F2W7JQ736.jpg', // Placeholder image
+        contentBlobId: contentBlobId,
+        publishDate: new Date().toISOString(),
+      };
+      
+      const manifestBlobId = await uploadJsonToWalrus(manifest, 1);
       setUploadProgress(70);
-      
-      // Step 3: Store encryption key in Seal service (90%)
+
+      // Step 4: Store encryption key in Seal service (90%)
       message.loading({ content: 'Storing encryption key...', key: 'upload', duration: 0 });
       
       await storeKeyInSeal(encryptedData.keyId, encryptedData.encryptionKey, API_URL);
       setUploadProgress(90);
       
-      // Step 4: Done (100%)
+      // Step 5: Done (100%)
       setUploadProgress(100);
       message.destroy('upload');
       
       return {
-        walrusBlobId,
+        contentBlobId,
+        manifestBlobId,
         sealKeyId: Array.from(encryptedData.keyId),
       };
     } catch (error: any) {
@@ -154,20 +172,50 @@ export function PublishReport() {
     }
 
     try {
-      // Step 1: Upload file to Walrus (with encryption)
-      const { walrusBlobId, sealKeyId } = await uploadToWalrus(formData.contentFile);
+      // Step 1: Upload file to Walrus (Content + Manifest)
+      const { contentBlobId, manifestBlobId, sealKeyId } = await uploadToWalrus(formData.contentFile);
       
       // Step 2: Publish report on-chain
       message.loading({ content: 'Publishing report on-chain...', key: 'publish', duration: 0 });
       
-      await publishReport(
+      const result = await publishReport(
         groupId,
         adminCapId,
         formData.title,
         formData.summary,
-        walrusBlobId,
+        contentBlobId, // We store the Content Blob ID on-chain for decryption access
         sealKeyId
       );
+
+      console.log('Transaction Result:', result);
+
+      // Extract Report object ID from transaction result
+      let reportId = 'unknown';
+      if (result && typeof result === 'object' && 'effects' in result) {
+        const effects = result.effects as any;
+        if (effects?.created?.[0]?.reference?.objectId) {
+          reportId = effects.created[0].reference.objectId;
+        }
+      }
+      
+      console.log('Extracted Report ID:', reportId);
+      
+      // Step 3: Notify Backend to trigger Telegram Push (using Manifest ID)
+      // Even if we can't parse reportId, if the transaction succeeded (didn't throw), we should try to push.
+      try {
+           console.log(`Sending notification to backend: ${API_URL}/reports/publish`, { manifestBlobId });
+           message.loading({ content: 'Sending notification to Telegram...', key: 'notify', duration: 0 });
+           
+           const response = await axios.post(`${API_URL}/reports/publish`, { 
+             manifestBlobId 
+           });
+           
+           console.log('Backend response:', response.data);
+           message.success({ content: 'Notification sent to Telegram!', key: 'notify', duration: 3 });
+      } catch (notifyError) {
+           console.error('Failed to trigger backend notification:', notifyError);
+           message.warning({ content: 'Report published, but Telegram notification failed.', key: 'notify', duration: 4 });
+      }
 
       message.success({ content: 'Report published successfully! 🎉', key: 'publish', duration: 3 });
       
@@ -177,7 +225,7 @@ export function PublishReport() {
       // Navigate back to group detail
       setTimeout(() => {
         navigate(`/groups/${groupId}`);
-      }, 1000);
+      }, 1500);
     } catch (error: any) {
       console.error('Failed to publish report:', error);
       message.error({ 

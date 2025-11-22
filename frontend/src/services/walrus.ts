@@ -209,6 +209,45 @@ export async function uploadEncryptedReport(
 }
 
 /**
+ * Upload JSON data to Walrus
+ */
+export async function uploadJsonToWalrus(data: any, epochs: number = 1): Promise<string> {
+  const jsonString = JSON.stringify(data);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const result = await uploadToWalrus(blob, epochs);
+  
+  // Reuse the ID extraction logic from uploadEncryptedReport
+  // (Ideally this logic should be in a shared helper, but for now we inline or reuse)
+  
+  // Check for storedQuiltBlobs (Quilts API)
+  if (result.storedQuiltBlobs && result.storedQuiltBlobs.length > 0) {
+    const firstPatch = result.storedQuiltBlobs[0];
+    if (firstPatch.quiltPatchId) {
+      return firstPatch.quiltPatchId;
+    }
+  }
+  
+  // Fallback: Check for blobStoreResult structure (standard Blob API)
+  if (result.blobStoreResult) {
+    const blobStore = result.blobStoreResult;
+    if (blobStore.newlyCreated) {
+      return blobStore.newlyCreated.blobObject.blobId;
+    } else if (blobStore.alreadyCertified) {
+      return blobStore.alreadyCertified.blobId;
+    }
+  }
+  
+  // Legacy fallback
+  if (result.newlyCreated) {
+    return result.newlyCreated.blobObject.blobId;
+  } else if (result.alreadyCertified) {
+    return result.alreadyCertified.blobId;
+  }
+  
+  throw new Error('Failed to get blob ID from JSON upload');
+}
+
+/**
  * Download and decrypt report from Walrus
  */
 export async function downloadEncryptedReport(blobId: string): Promise<Blob> {

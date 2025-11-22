@@ -1,11 +1,10 @@
+import './env.js'; // Must be the first import to load env vars before other imports
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { telegramRouter } from './telegram/routes.js';
 import { sealRouter } from './seal/routes.js';
 import { walrusRouter } from './walrus/routes.js';
-
-dotenv.config();
+import { reportsRouter } from './reports/routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +22,7 @@ app.get('/health', (req, res) => {
 app.use('/telegram', telegramRouter);
 app.use('/seal', sealRouter);
 app.use('/walrus', walrusRouter);
+app.use('/reports', reportsRouter);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

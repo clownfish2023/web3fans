@@ -1,16 +1,30 @@
 import TelegramBot from 'node-telegram-bot-api';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 export class TelegramService {
   private bot: TelegramBot | null = null;
 
   constructor() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
+    // Use a custom env var for Telegram specific proxy to avoid affecting global axios/fetch
+    const proxy = process.env.TELEGRAM_PROXY || process.env.HTTPS_PROXY || process.env.https_proxy;
     
     if (token) {
-      this.bot = new TelegramBot(token, { polling: true });
+      // Polling is disabled to avoid conflict errors during dev/test if multiple instances run.
+      // Set to true if you need to handle incoming messages (like /link command).
+      const options: any = { polling: false };
+      
+      if (proxy) {
+        console.log(`🔌 Configuring Telegram Bot with proxy: ${proxy}`);
+        options.request = {
+          proxy: proxy,
+        };
+      } else {
+         // Fallback: If no proxy env var is set, but we suspect we are in a restricted environment,
+         // the user might want to hardcode one in .env.
+         // For now, we just rely on the env var.
+      }
+
+      this.bot = new TelegramBot(token, options);
       this.setupHandlers();
       console.log('✅ Telegram bot initialized');
     } else {
