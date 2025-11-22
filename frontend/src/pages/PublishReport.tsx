@@ -131,6 +131,9 @@ export function PublishReport() {
         imageUrl: 'https://assets.staticimg.com/cms/media/3gLd055qS5548F2W7JQ736.jpg', // Placeholder image
         contentBlobId: contentBlobId,
         publishDate: new Date().toISOString(),
+        // Add groupId and sealKeyId for decentralized access
+        groupId: groupId,
+        sealKeyId: Array.from(encryptedData.keyId),
       };
       
       const manifestBlobId = await uploadJsonToWalrus(manifest, 1);

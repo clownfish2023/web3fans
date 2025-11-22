@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { Report } from '@/types';
 import { retrieveKeyFromSeal, decryptFile } from '@/utils/encryption';
-import { downloadFromWalrus } from '@/services/walrus';
+import { downloadFromWalrus, readJsonFromWalrus } from '@/services/walrus';
 import { API_URL } from '@/config/constants';
 import { message } from 'antd';
 import { ArrowLeft, Lock, FileText, Download, Eye, Share2, Copy, Send } from 'lucide-react';
@@ -31,8 +31,42 @@ export function ViewReport() {
 
   const loadReport = async () => {
     if (!reportId) return;
+    setLoading(true);
     
     try {
+      // Strategy: Try to treat reportId as a Walrus Manifest ID first.
+      // Walrus IDs are typically base64 strings (often ~44 chars or longer), while Sui Object IDs are 0x + 64 hex chars.
+      // Simple heuristic: If it doesn't start with 0x, assume it's a Walrus ID.
+      const isWalrusId = !reportId.startsWith('0x');
+      
+      if (isWalrusId) {
+        try {
+          console.log('Fetching report manifest from Walrus:', reportId);
+          const manifest = await readJsonFromWalrus<any>(reportId);
+          
+          if (manifest && manifest.title) {
+            console.log('✅ Loaded report from Walrus Manifest:', manifest);
+            
+            setReport({
+              id: reportId,
+              groupId: manifest.groupId || 'unknown', // Handle legacy manifests
+              title: manifest.title,
+              summary: manifest.summary,
+              walrusBlobId: manifest.contentBlobId,
+              sealKeyId: manifest.sealKeyId, // Handle legacy manifests
+              publisher: '0x...', // Manifest usually doesn't contain publisher address
+              publishedAt: manifest.publishDate ? new Date(manifest.publishDate).getTime() : Date.now(),
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (walrusError) {
+          console.warn('Failed to load as Walrus Manifest, falling back to chain lookup:', walrusError);
+          // Continue to chain lookup fallback
+        }
+      }
+
+      // Fallback: Load from Sui Chain (as Object ID)
       const result = await client.getObject({
         id: reportId,
         options: {
@@ -53,10 +87,9 @@ export function ViewReport() {
           publishedAt: parseInt(fields.published_at),
         };
         
-        console.log('✅ Loaded report:', {
+        console.log('✅ Loaded report from Chain:', {
           id: reportData.id,
           walrusBlobId: reportData.walrusBlobId,
-          walrusBlobIdLength: reportData.walrusBlobId?.length,
         });
         
         setReport(reportData);

@@ -248,6 +248,25 @@ export async function uploadJsonToWalrus(data: any, epochs: number = 1): Promise
 }
 
 /**
+ * Read JSON content from Walrus
+ */
+export async function readJsonFromWalrus<T = any>(blobId: string): Promise<T> {
+  const blob = await downloadFromWalrus(blobId);
+  const text = await blob.text();
+  
+  if (!text || text.trim().length === 0) {
+    throw new Error('Downloaded JSON content is empty');
+  }
+  
+  try {
+    return JSON.parse(text) as T;
+  } catch (error) {
+    console.error('Failed to parse JSON from Walrus:', error);
+    throw new Error('Invalid JSON format');
+  }
+}
+
+/**
  * Download and decrypt report from Walrus
  */
 export async function downloadEncryptedReport(blobId: string): Promise<Blob> {
