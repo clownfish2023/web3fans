@@ -266,7 +266,29 @@ export function ViewReport() {
     );
   }
 
-  return (
+          <div className="bg-white rounded-lg shadow-md p-8 mb-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{report.title}</h1>
+              <p className="text-gray-600 mb-4">{report.summary}</p>
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-left inline-block max-w-xl">
+                <h3 className="text-sm font-bold text-yellow-800 flex items-center">
+                  ⚠️ Legacy Report Format
+                </h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  This report was published using an older version of the protocol and lacks the necessary metadata (Group ID / Key ID) for decryption.
+                </p>
+                <p className="text-sm text-yellow-700 mt-2">
+                  Please publish a new report to test the full functionality.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-6">
@@ -395,6 +417,15 @@ export function ViewReport() {
                   </>
                 )}
               </button>
+            ) : report.groupId === 'unknown' ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                  ⚠️ Legacy Report Format
+                </h3>
+                <p className="text-yellow-800 mb-4">
+                  This report lacks the necessary metadata (Group ID) for decryption and subscription.
+                </p>
+              </div>
             ) : (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-yellow-900 mb-2">
