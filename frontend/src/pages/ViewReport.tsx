@@ -40,9 +40,6 @@ export function ViewReport() {
     setLoading(true);
     
     try {
-      // Strategy: Try to treat reportId as a Walrus Manifest ID first.
-      // Walrus IDs are typically base64 strings (often ~44 chars or longer), while Sui Object IDs are 0x + 64 hex chars.
-      // Simple heuristic: If it doesn't start with 0x, assume it's a Walrus ID.
       const isWalrusId = !reportId.startsWith('0x');
       
       if (isWalrusId) {
@@ -55,12 +52,12 @@ export function ViewReport() {
             
             setReport({
               id: reportId,
-              groupId: manifest.groupId || 'unknown', // Handle legacy manifests
+              groupId: manifest.groupId || 'unknown',
               title: manifest.title,
               summary: manifest.summary,
               walrusBlobId: manifest.contentBlobId,
-              sealKeyId: manifest.sealKeyId, // Handle legacy manifests
-              publisher: '0x...', // Manifest usually doesn't contain publisher address
+              sealKeyId: manifest.sealKeyId,
+              publisher: '0x...',
               publishedAt: manifest.publishDate ? new Date(manifest.publishDate).getTime() : Date.now(),
             });
             setLoading(false);
@@ -68,11 +65,9 @@ export function ViewReport() {
           }
         } catch (walrusError) {
           console.warn('Failed to load as Walrus Manifest, falling back to chain lookup:', walrusError);
-          // Continue to chain lookup fallback
         }
       }
 
-      // Fallback: Load from Sui Chain (as Object ID)
       const result = await client.getObject({
         id: reportId,
         options: {
@@ -109,14 +104,7 @@ export function ViewReport() {
   };
 
   const findAccessKey = async () => {
-    console.log('[DEBUG] findAccessKey START');
-    console.log('[DEBUG] Current Account:', currentAccount?.address);
-    console.log('[DEBUG] Report Group ID:', report?.groupId);
-
-    if (!currentAccount || !report) {
-      console.log('[DEBUG] findAccessKey ABORT: No account or report');
-      return;
-    }
+    if (!currentAccount || !report) return;
     
     console.log('🔍 Checking subscription for Group ID:', report.groupId);
     
@@ -125,9 +113,7 @@ export function ViewReport() {
       let nextCursor = null;
       let foundKey = null;
 
-      // Pagination loop to find AccessKey
       while (hasNextPage && !foundKey) {
-        console.log('[DEBUG] Fetching owned objects page...');
         const response: any = await client.getOwnedObjects({
           owner: currentAccount.address,
           cursor: nextCursor,
@@ -136,25 +122,34 @@ export function ViewReport() {
             showType: true,
           },
         });
-        
-        console.log(`[DEBUG] Fetched ${response.data.length} objects`);
 
         const accessKey = response.data.find((obj: any) => {
           const fields = obj.data?.content?.fields;
           if (!fields) return false;
           
-          // Simple heuristic: check if it has group_id field
           const objGroupId = fields.group_id;
           if (!objGroupId) return false;
 
-          // Debug log to see what keys the user has
-          console.log(`[DEBUG] Found potential AccessKey: ${obj.data.objectId}`);
-          console.log(`   -> Key Group ID: ${objGroupId}`);
-          console.log(`   -> Report Group ID: ${report.groupId}`);
-          console.log(`   -> Match? ${normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId)}`);
+          const isIdMatch = normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId);
+          
+          if (isIdMatch) {
+             console.log(`[DEBUG] ID Match Found: ${obj.data.objectId}`);
+             console.log(`   -> Type: ${obj.data.type}`);
+          }
 
-          // Normalize IDs for comparison
-          return normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId);
+          // Strict Type Check: Ensure it is an AccessKey
+          if (!obj.data.type || !obj.data.type.includes('::group::AccessKey')) {
+             if (isIdMatch) {
+                 console.log(`   -> ❌ Rejected: Object is not an AccessKey (Type mismatch)`);
+             }
+             return false;
+          }
+          
+          if (isIdMatch) {
+              console.log(`   -> ✅ Accepted: Valid AccessKey found`);
+          }
+
+          return isIdMatch;
         });
 
         if (accessKey) {
@@ -169,7 +164,6 @@ export function ViewReport() {
         console.log('✅ Found valid AccessKey:', foundKey.data.objectId);
         setAccessKeyId(foundKey.data.objectId);
         
-        // Get expiry time from AccessKey
         if (foundKey.data.content && 'fields' in foundKey.data.content) {
           const fields = foundKey.data.content.fields as any;
           if (fields.expires_at) {
@@ -191,13 +185,11 @@ export function ViewReport() {
       return;
     }
 
-    // Check if subscription is still valid
     if (subscriptionExpiry && subscriptionExpiry <= Date.now()) {
       message.error({
         content: 'Your subscription has expired. Please renew your subscription to access this report.',
         duration: 5,
       });
-      // Navigate back to group page for renewal
       setTimeout(() => {
         navigate(`/groups/${report.groupId}`);
       }, 2000);
@@ -208,7 +200,6 @@ export function ViewReport() {
       setDecrypting(true);
       message.loading({ content: 'Decrypting report...', key: 'decrypt', duration: 0 });
       
-      // Step 1: Download encrypted file from Walrus
       message.loading({ 
         content: 'Downloading from Walrus...', 
         key: 'decrypt', 
@@ -217,19 +208,16 @@ export function ViewReport() {
       
       const encryptedBlob = await downloadFromWalrus(report.walrusBlobId);
       
-      // Step 2: Retrieve decryption key from Seal
       message.loading({ content: 'Retrieving decryption key...', key: 'decrypt', duration: 0 });
       const keyId = new Uint8Array(report.sealKeyId);
       const encryptionKey = await retrieveKeyFromSeal(keyId, accessKeyId, API_URL);
       
-      // Step 3: Decrypt the file
       message.loading({ content: 'Decrypting content...', key: 'decrypt', duration: 0 });
       const decrypted = await decryptFile(encryptedBlob, encryptionKey);
       
       setDecryptedBlob(decrypted);
       message.success({ content: 'Report decrypted successfully!', key: 'decrypt', duration: 2 });
     } catch (error: any) {
-      
       let errorMessage = 'Failed to decrypt report';
       
       if (error.message.includes('404') || error.message.includes('Not Found')) {
@@ -316,7 +304,6 @@ export function ViewReport() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Header */}
       <div className="mb-6">
         <button
           onClick={() => navigate(-1)}
@@ -327,7 +314,6 @@ export function ViewReport() {
         </button>
       </div>
 
-      {/* Report Info - Public (Anyone can view) */}
       <div className="bg-white rounded-lg shadow-md p-8 mb-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
@@ -356,7 +342,6 @@ export function ViewReport() {
             </p>
           </div>
           
-          {/* Share Button */}
           <div className="relative">
             <button
               onClick={() => setShowShareMenu(!showShareMenu)}
@@ -388,7 +373,6 @@ export function ViewReport() {
         </div>
       </div>
 
-      {/* Decryption Section */}
       {!decryptedBlob ? (
         <div className="bg-white rounded-lg shadow-md p-8">
           <div className="text-center">
@@ -400,7 +384,6 @@ export function ViewReport() {
               This report is encrypted and stored on Walrus. Click the button below to decrypt and view the full content.
             </p>
             
-            {/* Subscription Status */}
             {subscriptionExpiry && (
               <div className={`mb-6 p-4 rounded-lg ${
                 subscriptionExpiry > Date.now() 
