@@ -24,11 +24,16 @@ export function ViewReport() {
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   useEffect(() => {
-    if (reportId && currentAccount) {
+    if (reportId) {
       loadReport();
+    }
+  }, [reportId]);
+
+  useEffect(() => {
+    if (report && currentAccount) {
       findAccessKey();
     }
-  }, [reportId, currentAccount]);
+  }, [report, currentAccount]);
 
   const loadReport = async () => {
     if (!reportId) return;
@@ -104,7 +109,14 @@ export function ViewReport() {
   };
 
   const findAccessKey = async () => {
-    if (!currentAccount || !report) return;
+    console.log('[DEBUG] findAccessKey START');
+    console.log('[DEBUG] Current Account:', currentAccount?.address);
+    console.log('[DEBUG] Report Group ID:', report?.groupId);
+
+    if (!currentAccount || !report) {
+      console.log('[DEBUG] findAccessKey ABORT: No account or report');
+      return;
+    }
     
     console.log('🔍 Checking subscription for Group ID:', report.groupId);
     
@@ -115,6 +127,7 @@ export function ViewReport() {
 
       // Pagination loop to find AccessKey
       while (hasNextPage && !foundKey) {
+        console.log('[DEBUG] Fetching owned objects page...');
         const response: any = await client.getOwnedObjects({
           owner: currentAccount.address,
           cursor: nextCursor,
@@ -123,6 +136,8 @@ export function ViewReport() {
             showType: true,
           },
         });
+        
+        console.log(`[DEBUG] Fetched ${response.data.length} objects`);
 
         const accessKey = response.data.find((obj: any) => {
           const fields = obj.data?.content?.fields;
@@ -131,6 +146,12 @@ export function ViewReport() {
           // Simple heuristic: check if it has group_id field
           const objGroupId = fields.group_id;
           if (!objGroupId) return false;
+
+          // Debug log to see what keys the user has
+          console.log(`[DEBUG] Found potential AccessKey: ${obj.data.objectId}`);
+          console.log(`   -> Key Group ID: ${objGroupId}`);
+          console.log(`   -> Report Group ID: ${report.groupId}`);
+          console.log(`   -> Match? ${normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId)}`);
 
           // Normalize IDs for comparison
           return normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId);
@@ -293,29 +314,7 @@ export function ViewReport() {
     );
   }
 
-          <div className="bg-white rounded-lg shadow-md p-8 mb-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{report.title}</h1>
-              <p className="text-gray-600 mb-4">{report.summary}</p>
-              
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-left inline-block max-w-xl">
-                <h3 className="text-sm font-bold text-yellow-800 flex items-center">
-                  ⚠️ Legacy Report Format
-                </h3>
-                <p className="text-sm text-yellow-700 mt-1">
-                  This report was published using an older version of the protocol and lacks the necessary metadata (Group ID / Key ID) for decryption.
-                </p>
-                <p className="text-sm text-yellow-700 mt-2">
-                  Please publish a new report to test the full functionality.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
+  return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-6">
@@ -538,4 +537,3 @@ export function ViewReport() {
     </div>
   );
 }
-
