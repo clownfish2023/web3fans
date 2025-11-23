@@ -13,8 +13,6 @@ build/
 
 # Env
 .env
-.env.local
-.env.*.local
 
 # IDE
 .vscode/
