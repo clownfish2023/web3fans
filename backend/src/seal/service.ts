@@ -86,7 +86,7 @@ export class SealService {
 
       console.log('🔓 Successfully decrypted stateless key');
       return decrypted;
-    } catch (error) {
+    } catch (error: any) {
       // If decryption fails (e.g. bad auth tag), it means the keyId was invalid or tampered with
       console.warn('❌ Failed to decrypt key (might be invalid or legacy keyId):', error.message);
       return null;
