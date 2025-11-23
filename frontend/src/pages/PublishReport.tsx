@@ -122,7 +122,14 @@ export function PublishReport() {
       const contentBlobId = await uploadEncryptedReport(encryptedData.encryptedBlob, 1);
       setUploadProgress(50);
       
-      // Step 3: Upload Manifest to Walrus (50% - 70%)
+      // Step 3: Store encryption key in Seal service FIRST (to get stateless ID)
+      // We do this before creating the manifest because we need the returned stateless Key ID
+      message.loading({ content: 'Storing encryption key...', key: 'upload', duration: 0 });
+      
+      const statelessKeyId = await storeKeyInSeal(encryptedData.keyId, encryptedData.encryptionKey, API_URL);
+      setUploadProgress(70);
+
+      // Step 4: Upload Manifest to Walrus (with the CORRECT keyId)
       message.loading({ content: 'Uploading manifest to Walrus...', key: 'upload', duration: 0 });
       
       const manifest = {
@@ -133,17 +140,11 @@ export function PublishReport() {
         publishDate: new Date().toISOString(),
         // Add groupId and sealKeyId for decentralized access
         groupId: groupId,
-        sealKeyId: Array.from(encryptedData.keyId),
+        // Use the stateless key ID returned from backend
+        sealKeyId: Array.from(statelessKeyId),
       };
       
       const manifestBlobId = await uploadJsonToWalrus(manifest, 1);
-      setUploadProgress(70);
-
-      // Step 4: Store encryption key in Seal service (90%)
-      message.loading({ content: 'Storing encryption key...', key: 'upload', duration: 0 });
-      
-      await storeKeyInSeal(encryptedData.keyId, encryptedData.encryptionKey, API_URL);
-      setUploadProgress(90);
       
       // Step 5: Done (100%)
       setUploadProgress(100);
@@ -152,7 +153,7 @@ export function PublishReport() {
       return {
         contentBlobId,
         manifestBlobId,
-        sealKeyId: Array.from(encryptedData.keyId),
+        sealKeyId: Array.from(statelessKeyId),
       };
     } catch (error: any) {
       throw new Error(`Upload failed: ${error.message}`);

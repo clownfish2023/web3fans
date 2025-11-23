@@ -188,12 +188,13 @@ export function base64ToBytes(base64: string): Uint8Array {
 
 /**
  * Store encryption key in backend Seal service
+ * Returns the new stateless keyId (as bytes) that SHOULD be used instead of the generated one
  */
 export async function storeKeyInSeal(
   keyId: Uint8Array,
   encryptionKey: Uint8Array,
   apiUrl: string
-): Promise<void> {
+): Promise<Uint8Array> {
   const keyBase64 = bytesToBase64(encryptionKey);
   
   const response = await fetch(`${apiUrl}/seal/store-key`, {
@@ -211,6 +212,16 @@ export async function storeKeyInSeal(
     const error = await response.text();
     throw new Error(`Failed to store key in Seal: ${error}`);
   }
+  
+  const data = await response.json();
+  
+  // If backend returns a new keyId (Stateless Mode), use it!
+  if (data.keyId && typeof data.keyId === 'string') {
+    console.log('🔐 Received stateless keyId from backend');
+    return new TextEncoder().encode(data.keyId);
+  }
+  
+  return keyId;
 }
 
 /**

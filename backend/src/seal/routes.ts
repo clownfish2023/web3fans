@@ -18,11 +18,12 @@ sealRouter.post('/store-key', async (req, res) => {
       });
     }
 
-    await sealService.storeKey(keyId, encryptionKey);
+    const newKeyId = await sealService.storeKey(keyId, encryptionKey);
 
     res.json({
       success: true,
       message: 'Key stored successfully',
+      keyId: newKeyId
     });
   } catch (error) {
     console.error('Failed to store key:', error);
