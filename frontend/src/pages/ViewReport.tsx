@@ -111,9 +111,11 @@ export function ViewReport() {
     try {
       let hasNextPage = true;
       let nextCursor = null;
-      let foundKey = null;
+      
+      // Store the best expired key found so far (latest expiration), in case we don't find any active one
+      let bestExpiredKey: { id: string; expiresAt: number } | null = null;
 
-      while (hasNextPage && !foundKey) {
+      while (hasNextPage) {
         const response: any = await client.getOwnedObjects({
           owner: currentAccount.address,
           cursor: nextCursor,
@@ -123,58 +125,56 @@ export function ViewReport() {
           },
         });
 
-        const accessKey = response.data.find((obj: any) => {
-          const fields = obj.data?.content?.fields;
-          if (!fields) return false;
-          
-          const objGroupId = fields.group_id;
-          if (!objGroupId) return false;
+        // Loop through objects in current page
+        for (const obj of response.data) {
+            const fields = obj.data?.content?.fields;
+            if (!fields) continue;
+            
+            const objGroupId = fields.group_id;
+            if (!objGroupId) continue;
 
-          const isIdMatch = normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId);
-          
-          if (isIdMatch) {
-             console.log(`[DEBUG] ID Match Found: ${obj.data.objectId}`);
-             console.log(`   -> Type: ${obj.data.type}`);
-          }
+            const isIdMatch = normalizeSuiObjectId(objGroupId) === normalizeSuiObjectId(report.groupId);
+            if (!isIdMatch) continue;
 
-          // Strict Type Check: Ensure it is an AccessKey or Subscription
-          // We accept both 'AccessKey' and 'Subscription' to match the actual contract types
-          if (!obj.data.type || (!obj.data.type.includes('::group::AccessKey') && !obj.data.type.includes('::group::Subscription'))) {
-             if (isIdMatch) {
-                 console.log(`   -> ❌ Rejected: Object is not a valid Subscription/AccessKey (Type mismatch)`);
-             }
-             return false;
-          }
-          
-          if (isIdMatch) {
-              console.log(`   -> ✅ Accepted: Valid Subscription/AccessKey found`);
-          }
+            // Strict Type Check
+            if (!obj.data.type || (!obj.data.type.includes('::group::AccessKey') && !obj.data.type.includes('::group::Subscription'))) {
+                continue;
+            }
 
-          return isIdMatch;
-        });
+            console.log(`[DEBUG] Found Key: ${obj.data.objectId}, Type: ${obj.data.type}`);
+            
+            const expiresAt = fields.expires_at ? parseInt(fields.expires_at) : 0;
+            const isExpired = expiresAt <= Date.now();
 
-        if (accessKey) {
-          foundKey = accessKey;
+            if (!isExpired) {
+                console.log('✅ Found active subscription! Stopping search.');
+                setAccessKeyId(obj.data.objectId);
+                setSubscriptionExpiry(expiresAt);
+                // Found a valid key, we can stop immediately (user unlikely to have multiple valid subs)
+                return; 
+            } else {
+                console.log('   -> Expired. Storing as candidate if no active key found.');
+                // It's expired. Keep track of the "latest" expired key
+                if (!bestExpiredKey || expiresAt > bestExpiredKey.expiresAt) {
+                    bestExpiredKey = { id: obj.data.objectId, expiresAt };
+                }
+            }
         }
 
         hasNextPage = response.hasNextPage;
         nextCursor = response.nextCursor;
       }
       
-      if (foundKey && foundKey.data) {
-        console.log('✅ Found valid AccessKey:', foundKey.data.objectId);
-        setAccessKeyId(foundKey.data.objectId);
-        
-        if (foundKey.data.content && 'fields' in foundKey.data.content) {
-          const fields = foundKey.data.content.fields as any;
-          if (fields.expires_at) {
-            const expiresAt = parseInt(fields.expires_at);
-            setSubscriptionExpiry(expiresAt);
-          }
-        }
+      // If we are here, it means we didn't find any active key in all pages.
+      // Check if we found an expired one.
+      if (bestExpiredKey) {
+        console.log('❌ No active subscription found. Using latest expired key.');
+        setAccessKeyId(bestExpiredKey.id);
+        setSubscriptionExpiry(bestExpiredKey.expiresAt);
       } else {
-        console.log('❌ No active subscription found for this group.');
+        console.log('❌ No subscription found for this group.');
       }
+
     } catch (error) {
       console.error('Failed to find access key:', error);
     }
