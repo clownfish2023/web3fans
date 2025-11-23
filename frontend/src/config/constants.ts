@@ -2,7 +2,7 @@
 export const NETWORK = import.meta.env.VITE_SUI_NETWORK || 'testnet';
 
 // Contract configuration
-export const PACKAGE_ID = import.meta.env.VITE_PACKAGE_ID || '0x5a44c1c0846bfb666b4db5289f4f51683373668737a768bf8a16c87a867f0ae5';
+export const PACKAGE_ID = import.meta.env.VITE_PACKAGE_ID || '0xeeaa74b375a9c23a74d1e8e6161310e06610dc6bde4d317a2c6b4b4da06252bd';
 
 // Validate Package ID on load
 if (!PACKAGE_ID || PACKAGE_ID === '0x0') {

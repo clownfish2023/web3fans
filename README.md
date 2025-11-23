@@ -1,144 +1,144 @@
-# Web3 投研订阅社交 DApp
+# Web3 Research Subscription & Social DApp
 
-基于 Sui Seal + Walrus 的专业投研内容订阅平台
+A Professional Research Content Subscription Platform based on Sui Seal + Walrus
 
-## 项目简介
+## Introduction
 
-这是一个专业的 Web3 投研订阅社交 DApp，支持：
+This is a professional Web3 research subscription and social DApp that supports:
 
-- 🔐 **访问控制**：基于 Sui Seal 的订阅访问控制
-- 📁 **去中心化存储**：使用 Walrus 存储加密投研报告
-- 💬 **Telegram 集成**：关联 Telegram 群组和用户身份
-- 💰 **订阅机制**：灵活的订阅周期和价格设置
-- 📊 **内容管理**：支持摘要免费、详情付费的内容模式
+- 🔐 **Access Control**: Subscription-based access control powered by Sui Seal
+- 📁 **Decentralized Storage**: Encrypted research reports stored on Walrus
+- 💬 **Telegram Integration**: Linking Telegram groups with user identities
+- 💰 **Subscription Mechanism**: Flexible subscription periods and pricing
+- 📊 **Content Management**: Free summary + paid full content model
 
-## 功能特性
+## Features
 
-### 群组管理
-- 创建投研群组
-- 设置群组介绍、订阅价格、订阅周期
-- 设置人数上限
-- 管理群组成员
+### Group Management
+- Create research groups
+- Set group introduction, subscription price, and period
+- Set member limits
+- Manage group members
 
-### 报告发布
-- 群组所有者可以发布研究报告
-- 发布报告摘要（免费公开）
-- 报告详情加密上传至 Walrus
-- 只有订阅用户可以访问详情
-- 支持多种文件格式（PDF, DOC, DOCX, TXT, MD）
-- 自动权限验证（GroupAdminCap）
+### Report Publishing
+- Group owners can publish research reports
+- Publish report summaries (free & public)
+- Encrypted report details uploaded to Walrus
+- Only subscribers can access full details
+- Supports multiple formats (PDF, DOC, DOCX, TXT, MD)
+- Automatic permission verification (GroupAdminCap)
 
-### 订阅系统
-- 付费订阅群组
-- 基于时间的访问控制
-- 自动过期管理
+### Subscription System
+- Paid group subscriptions
+- Time-based access control
+- Automatic expiration management
 
-### 用户身份
-- Sui 地址与 Telegram ID 关联
-- 订阅状态查询
-- 访问权限验证
+### User Identity
+- Link Sui address with Telegram ID
+- Subscription status query
+- Access permission verification
 
-## 项目结构
+## Project Structure
 
 ```
 web3fans/
-├── contracts/          # Move 智能合约
+├── contracts/          # Move Smart Contracts
 │   ├── sources/       
-│   │   ├── group.move          # 群组管理
-│   │   ├── subscription.move   # 订阅系统
-│   │   └── report.move         # 报告管理
+│   │   ├── group.move          # Group Management
+│   │   ├── subscription.move   # Subscription System
+│   │   └── report.move         # Report Management
 │   ├── tests/
 │   └── Move.toml
-├── frontend/          # React 前端应用
+├── frontend/          # React Frontend App
 │   ├── src/
-│   │   ├── components/        # UI 组件
+│   │   ├── components/        # UI Components
 │   │   ├── hooks/            # React Hooks
-│   │   ├── services/         # API 服务
-│   │   ├── utils/            # 工具函数
+│   │   ├── services/         # API Services
+│   │   ├── utils/            # Utility Functions
 │   │   └── App.tsx
 │   └── package.json
-├── backend/           # Node.js 后端服务
+├── backend/           # Node.js Backend Service
 │   ├── src/
 │   │   ├── telegram/         # Telegram Bot
-│   │   ├── walrus/          # Walrus 集成
+│   │   ├── walrus/          # Walrus Integration
 │   │   └── index.ts
 │   └── package.json
 └── README.md
 ```
 
-## 技术栈
+## Tech Stack
 
-### 智能合约
-- **Sui Move**：智能合约开发
-- **Seal**：访问控制模式
+### Smart Contracts
+- **Sui Move**: Smart contract development
+- **Seal**: Access control pattern
 
-### 前端
-- **React 18**：前端框架
-- **TypeScript**：类型安全
-- **@mysten/dapp-kit**：Sui 钱包集成
-- **TailwindCSS**：UI 样式
-- **Ant Design**：组件库
+### Frontend
+- **React 18**: Frontend framework
+- **TypeScript**: Type safety
+- **@mysten/dapp-kit**: Sui wallet integration
+- **TailwindCSS**: UI styling
+- **Ant Design**: Component library
 
-### 后端
-- **Node.js**：后端服务
-- **Express**：Web 框架
-- **Telegraf**：Telegram Bot SDK
-- **Walrus SDK**：去中心化存储
+### Backend
+- **Node.js**: Backend service
+- **Express**: Web framework
+- **Telegraf**: Telegram Bot SDK
+- **Walrus SDK**: Decentralized storage
 
-## 🎉 合约已部署！
+## 🎉 Contract Deployed!
 
-✅ **Package ID**: `0x5a44c1c0846bfb666b4db5289f4f51683373668737a768bf8a16c87a867f0ae5` (V2 - 支持邀请链接)
+✅ **Package ID**: `0x5a44c1c0846bfb666b4db5289f4f51683373668737a768bf8a16c87a867f0ae5` (V2 - Supports Invite Links)
 
-### 📖 查看快速开始指南
+### 📖 Quick Start Guide
 
-**[👉 点击这里查看 QUICK_START.md](QUICK_START.md)** - 详细的启动步骤
+**[👉 Click here for QUICK_START.md](QUICK_START.md)** - Detailed startup steps
 
-### 简要步骤
+### Brief Steps
 
-1. **配置 Telegram Bot** (获取 token 并更新到 `backend/.env.local`)
-2. **安装依赖**: `npm install` (在 backend 和 frontend 目录)
-3. **启动服务**: 
-   - 后端: `cd backend && npm run dev`
-   - 前端: `cd frontend && npm run dev`
-4. **访问**: http://localhost:3000
+1. **Configure Telegram Bot** (Get token and update `backend/.env.local`)
+2. **Install Dependencies**: `npm install` (in both backend and frontend directories)
+3. **Start Services**: 
+   - Backend: `cd backend && npm run dev`
+   - Frontend: `cd frontend && npm run dev`
+4. **Access**: http://localhost:3000
 
-详细信息请查看 [DEPLOYMENT_INFO_V2.md](DEPLOYMENT_INFO_V2.md)（V1 部署信息：[DEPLOYMENT_INFO.md](DEPLOYMENT_INFO.md)）
+For detailed information, see [DEPLOYMENT_INFO_V2.md](DEPLOYMENT_INFO_V2.md) (V1 Info: [DEPLOYMENT_INFO.md](DEPLOYMENT_INFO.md))
 
-## 使用流程
+## User Flow
 
-### 创建投研群组
+### Create Research Group
 
-1. 连接 Sui 钱包
-2. 填写群组信息（名称、介绍、订阅价格、周期）
-3. 创建 Telegram 群组并获取群组 ID
-4. 关联 Sui 地址和 Telegram 群组
-5. 创建群组成功
+1. Connect Sui Wallet
+2. Fill in group info (name, description, price, period)
+3. Create Telegram group and get Group ID
+4. Link Sui address and Telegram group
+5. Group creation successful
 
-### 发布投研报告
+### Publish Research Report
 
-1. 进入群组管理页面
-2. 填写报告标题和摘要
-3. 上传报告详情文档（自动加密上传至 Walrus）
-4. 发布报告到 Telegram 群组
+1. Go to Group Management page
+2. Fill in report title and summary
+3. Upload report detail document (automatically encrypted and uploaded to Walrus)
+4. Publish report to Telegram group
 
-### 订阅群组
+### Subscribe to Group
 
-1. 浏览可用群组
-2. 选择订阅周期
-3. 支付订阅费用（SUI）
-4. 关联 Telegram ID
-5. 获得访问权限
+1. Browse available groups
+2. Select subscription period
+3. Pay subscription fee (SUI)
+4. Link Telegram ID
+5. Gain access permission
 
-### 查看报告
+### View Report
 
-1. 在 Telegram 群组中查看报告摘要
-2. 点击链接查看详情
-3. 系统自动验证订阅状态
-4. 订阅用户可解密查看完整报告
+1. View report summary in Telegram group
+2. Click link to view details
+3. System automatically verifies subscription status
+4. Subscribers can decrypt and view full report
 
-## 核心合约接口
+## Core Contract Interfaces
 
-### 创建群组
+### Create Group
 
 ```move
 public fun create_group(
@@ -152,7 +152,7 @@ public fun create_group(
 ): Group
 ```
 
-### 订阅群组
+### Subscribe
 
 ```move
 public fun subscribe(
@@ -164,7 +164,7 @@ public fun subscribe(
 ): Subscription
 ```
 
-### 发布报告
+### Publish Report
 
 ```move
 public fun publish_report(
@@ -177,7 +177,7 @@ public fun publish_report(
 ): Report
 ```
 
-### 验证访问权限
+### Verify Access
 
 ```move
 entry fun seal_approve(
@@ -189,156 +189,101 @@ entry fun seal_approve(
 )
 ```
 
-## 安全特性
-
-- ✅ 基于 Sui Seal 的访问控制
-- ✅ 报告内容加密存储
-- ✅ 自动过期管理
-- ✅ 防止重放攻击
-- ✅ 订阅状态验证
-
-## 许可证
+## License
 
 MIT License
 
-## 文档
+## Quick Start Scripts
 
-### 📖 使用指南
-- [快速开始指南](QUICK_START.md) - 立即开始使用
-- [用户使用指南](USER_GUIDE.md) - 详细的使用说明
-- [发布研报指南](docs/PUBLISH_REPORT_GUIDE.md) - 如何发布研究报告 ⭐ 新功能
-- [Seal + Walrus 使用指南](docs/SEAL_WALRUS_USAGE_GUIDE.md) - 完整技术实现 ⭐ 新增
-- [获取 Telegram 邀请链接](docs/HOW_TO_GET_TELEGRAM_INVITE_LINK.md)
-- [获取 Telegram Group ID](docs/HOW_TO_GET_TELEGRAM_GROUP_ID.md)
-- [SUI 金额说明](docs/SUI_AMOUNT_GUIDE.md)
-
-### 🏗️ 技术文档
-- [系统架构文档](ARCHITECTURE.md) - 技术架构和设计
-- [部署指南](DEPLOYMENT.md) - 完整的部署流程
-- [API 参考](API_REFERENCE.md) - 后端 API 文档
-- [Seal & Walrus 集成说明](SEAL_WALRUS_INTEGRATION.md) - 详细的集成实现
-- [故障排除](TROUBLESHOOTING.md) - 常见问题解决
-
-## 快速开始脚本
-
-项目提供了便捷的部署脚本：
+Convenient deployment scripts are provided:
 
 ```bash
-# 一键部署（交互式）
+# One-click deployment (Interactive)
 chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
 
-# 运行测试
+# Run tests
 chmod +x scripts/test.sh
 ./scripts/test.sh
 ```
 
-## 项目特点
+## Project Highlights
 
-### ✅ 完整实现
+### ✅ Complete Implementation
 
-- ✅ Move 智能合约（群组、订阅、访问控制）
-- ✅ 前端 DApp（React + TypeScript）
-- ✅ 后端服务（Node.js + Express）
-- ✅ Walrus 集成（去中心化存储）
-- ✅ Telegram 集成（社交平台）
-- ✅ Seal 访问控制（订阅验证）
+- ✅ Move Smart Contracts (Group, Subscription, Access Control)
+- ✅ Frontend DApp (React + TypeScript)
+- ✅ Backend Service (Node.js + Express)
+- ✅ Walrus Integration (Decentralized Storage)
+- ✅ Telegram Integration (Social Platform)
+- ✅ Seal Access Control (Subscription Verification)
 
-### 🔐 安全性
+### 🔐 Security
 
-- 基于 Sui Move 的智能合约安全
-- 内容端到端加密
-- 订阅状态链上验证
-- 自动过期管理
+- Sui Move-based Smart Contract Security
+- End-to-End Content Encryption
+- On-chain Subscription Verification
+- Automatic Expiration Management
 
-### 📱 用户体验
+### 📱 User Experience
 
-- 现代化 UI 设计
-- 钱包无缝集成
-- Telegram 即时通知
-- 响应式布局
+- Modern UI Design
+- Seamless Wallet Integration
+- Instant Telegram Notifications
+- Responsive Layout
 
-### 🚀 可扩展性
+### 🚀 Scalability
 
-- 模块化架构
-- 清晰的代码结构
-- 完善的文档
-- 易于二次开发
+- Modular Architecture
+- Clear Code Structure
+- Comprehensive Documentation
+- Easy to Extend
 
-## 技术亮点
+## Technical Highlights
 
-1. **Seal 访问控制模式**: 实现了基于订阅的内容访问控制
-2. **Walrus 集成**: 利用去中心化存储保证内容永久性
-3. **Telegram 集成**: 社交平台与 Web3 的无缝结合
-4. **类型安全**: 全栈 TypeScript + Move 类型系统
-5. **现代化前端**: React 18 + Vite + TailwindCSS
+1. **Seal Access Control**: Subscription-based content access control
+2. **Walrus Integration**: Permanent content storage using decentralized storage
+3. **Telegram Integration**: Seamless integration of social platform and Web3
 
-## 演示
+## Demo
 
-### 创建群组
+### Create Group
 
-![创建群组](docs/images/create-group.png)
+![Create Group](docs/images/create-group.png)
 
-### 订阅管理
+### Subscription Management
 
-![订阅管理](docs/images/subscription.png)
+![Subscription Management](docs/images/subscription.png)
 
-### 报告发布
+### Publish Report
 
-![报告发布](docs/images/publish-report.png)
+![Publish Report](docs/images/publish-report.png)
 
-## 贡献
+## Contributing
 
-欢迎贡献代码！请遵循以下步骤：
+Contributions are welcome! Please follow these steps:
 
-1. Fork 本仓库
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 路线图
 
-- [x] 核心功能实现
-- [x] 基础文档完善
-- [ ] 多语言支持
-- [ ] 移动端适配
-- [ ] 数据分析面板
-- [ ] 推荐算法
-- [ ] 社交功能增强
-- [ ] 多链支持
+## License
 
-## 社区
+MIT License - See [LICENSE](LICENSE) file for details
 
-- 💬 [Discord](https://discord.gg/web3fans)
-- 🐦 [Twitter](https://twitter.com/web3fans)
-- 📧 Email: contact@web3fans.example
+## Acknowledgments
 
-## 许可证
+Thanks to the following projects and communities:
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+- [Sui Network](https://sui.io/) - High-performance blockchain platform
+- [Walrus](https://walrus.site/) - Decentralized storage solution
+- [Telegram](https://telegram.org/) - Instant messaging platform
+- Sui Community for support and contributions
 
-## 致谢
+## Contact
 
-感谢以下项目和社区：
 
-- [Sui Network](https://sui.io/) - 高性能区块链平台
-- [Walrus](https://walrus.site/) - 去中心化存储解决方案
-- [Telegram](https://telegram.org/) - 即时通讯平台
-- Sui 社区的支持和贡献
-
-## 联系方式
-
-如有问题或建议：
-
-- 📖 查看文档
-- 🐛 提交 [Issue](https://github.com/your-repo/web3fans/issues)
-- 💬 加入 [Discord 社区](https://discord.gg/web3fans)
-- 📧 发送邮件至 support@web3fans.example
-
----
-
-⭐ 如果这个项目对你有帮助，请给我们一个 Star！
-
-**Happy Coding! 🚀**
 
